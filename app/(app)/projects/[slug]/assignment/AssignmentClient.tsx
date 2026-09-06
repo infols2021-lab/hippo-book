@@ -198,6 +198,10 @@ export default function AssignmentClient({
 
   const [loading, setLoading] = useState(true);
   const [isPreloading, setIsPreloading] = useState(true);
+  const [preloadProgress, setPreloadProgress] = useState<{
+    loaded: number;
+    total: number;
+  } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [assignment, setAssignment] = useState<AssignmentData | null>(null);
   
@@ -314,6 +318,7 @@ export default function AssignmentClient({
         primary: "#6366f1",
         accent: "#a855f7",
         bg: "linear-gradient(135deg, #f5f3ff 0%, #e0e7ff 100%)",
+        bgSolid: "#e0e7ff",
         cardBg: "rgba(255, 255, 255, 0.95)",
         text: "#1e1b4b",
         buttonText: "#ffffff",
@@ -324,6 +329,7 @@ export default function AssignmentClient({
       primary: "#0ea5e9",
       accent: "#f59e0b",
       bg: "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)",
+      bgSolid: "#e0f2fe",
       cardBg: "#ffffff",
       text: "#0c4a6e",
       buttonText: "#ffffff",
@@ -334,9 +340,11 @@ export default function AssignmentClient({
   useEffect(() => {
     document.body.style.setProperty("--project-primary", theme.primary);
     document.body.style.setProperty("--project-text", theme.text);
+    document.body.style.background = theme.bgSolid;
     return () => {
       document.body.style.removeProperty("--project-primary");
       document.body.style.removeProperty("--project-text");
+      document.body.style.background = "";
     };
   }, [theme]);
 
@@ -432,7 +440,10 @@ export default function AssignmentClient({
       setGatehouseRecommendation(null);
 
       // Мгновенные картинки: ждём декодирование всех изображений задания
-      await preloadAssignmentImages(nextQuestions);
+      setPreloadProgress(null);
+      await preloadAssignmentImages(nextQuestions, {
+        onProgress: (loaded, total) => setPreloadProgress({ loaded, total }),
+      });
 
       setIsPreloading(false);
       setLoading(false);
@@ -873,6 +884,29 @@ export default function AssignmentClient({
               transform: translateX(100%);
             }
           }
+          .preload-progress {
+            margin-top: 18px;
+            min-width: 200px;
+          }
+          .preload-progress-track {
+            height: 6px;
+            border-radius: 999px;
+            background: #eef2f7;
+            overflow: hidden;
+          }
+          .preload-progress-fill {
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #cbd5e1, #94a3b8);
+            transition: width 0.2s ease;
+          }
+          .preload-progress-text {
+            margin-top: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #94a3b8;
+            font-variant-numeric: tabular-nums;
+          }
         `}</style>
 
         <div className="preload-card">
@@ -882,7 +916,25 @@ export default function AssignmentClient({
           <div>
             <div className="preload-title">Подготовка окружения...</div>
             <div className="preload-subtitle">Синхронизация медиафайлов...</div>
-            <div className="preload-shimmer" />
+            {preloadProgress && preloadProgress.total > 0 ? (
+              <div className="preload-progress">
+                <div className="preload-progress-track">
+                  <div
+                    className="preload-progress-fill"
+                    style={{
+                      width: `${Math.round(
+                        (preloadProgress.loaded / preloadProgress.total) * 100
+                      )}%`,
+                    }}
+                  />
+                </div>
+                <div className="preload-progress-text">
+                  {preloadProgress.loaded} / {preloadProgress.total}
+                </div>
+              </div>
+            ) : (
+              <div className="preload-shimmer" />
+            )}
           </div>
         </div>
       </div>
@@ -902,8 +954,8 @@ export default function AssignmentClient({
     <div
       className="assignment-page"
       style={{
-        background: theme.bg,
-        minHeight: "100vh",
+        background: `${theme.bg} fixed`,
+        minHeight: "100dvh",
         color: theme.text,
       }}
     >

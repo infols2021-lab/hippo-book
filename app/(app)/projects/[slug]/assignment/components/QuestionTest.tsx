@@ -3,6 +3,7 @@
 import React from "react";
 import type { QuestionTest, TestOption } from "@/lib/assignments/types";
 import MediaRenderer from "./MediaRenderer";
+import { getImageUrl } from "@/lib/assignments/image";
 
 type Props = {
   question: QuestionTest;
@@ -174,7 +175,7 @@ export default function QuestionTest({ question, value, onChange, disabled }: Pr
                   <div style={{ marginTop: opt.text ? "4px" : "0", display: "flex", justifyContent: "flex-start" }}>
                     {opt.media[0].url?.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i) || opt.media[0].type?.startsWith("image") ? (
                       <img
-                        src={opt.media[0].url}
+                        src={getImageUrl(opt.media[0].url)}
                         alt="Медиавариант"
                         decoding="async"
                         loading="eager"

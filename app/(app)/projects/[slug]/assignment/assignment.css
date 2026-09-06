@@ -1734,6 +1734,13 @@
   border-radius: 20px;
   padding: 20px;
   margin-bottom: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.materials-block .materials-label,
+.materials-block .answer-label {
+  align-self: flex-start;
 }
 .materials-label, .answer-label {
   font-size: 14px;

@@ -357,6 +357,8 @@ function ZoomableImage({
   const [retryCount, setRetryCount] = useState(0);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const loadingRef = useRef(true); // синхронный флаг для таймаута
+  const autoRetryRef = useRef<NodeJS.Timeout | null>(null);
+  const AUTO_RETRY_LIMIT = 2; // авто-повторов после первой ошибки загрузки
 
   const finalUrl = useMemo(() => {
     const base = getImageUrl(url);
@@ -369,13 +371,16 @@ function ZoomableImage({
     isMounted.current = true;
     return () => {
       isMounted.current = false;
+      if (autoRetryRef.current) clearTimeout(autoRetryRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
 
   // Сброс состояния и установка таймаута при изменении URL
   useEffect(() => {
-    // Очищаем предыдущий таймаут
+    // Очищаем предыдущие таймауты
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (autoRetryRef.current) clearTimeout(autoRetryRef.current);
 
     if (!isMounted.current) return;
 
@@ -394,11 +399,13 @@ function ZoomableImage({
 
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (autoRetryRef.current) clearTimeout(autoRetryRef.current);
     };
   }, [finalUrl]);
 
   const handleLoad = useCallback(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (autoRetryRef.current) clearTimeout(autoRetryRef.current);
     loadingRef.current = false;
     if (isMounted.current) {
       setIsLoading(false);
@@ -408,11 +415,27 @@ function ZoomableImage({
   const handleError = useCallback(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     loadingRef.current = false;
+    if (!isMounted.current) return;
+
+    // Автоповтор: первый запрос к хранилищу/прокси может оборваться,
+    // а повторный (прогретый кэшем) — успешно пройти. Поэтому ошибка не
+    // показывается сразу, а делается до 2 авто-попыток.
+    if (retryCount < AUTO_RETRY_LIMIT) {
+      if (autoRetryRef.current) clearTimeout(autoRetryRef.current);
+      autoRetryRef.current = setTimeout(() => {
+        autoRetryRef.current = null;
+        if (isMounted.current) {
+          setRetryCount((c) => c + 1);
+        }
+      }, 300);
+      return;
+    }
+
     if (isMounted.current) {
       setHasError(true);
       setIsLoading(false);
     }
-  }, []);
+  }, [retryCount]);
 
   const handleRetry = useCallback(() => {
     if (isMounted.current) {
@@ -435,7 +458,7 @@ function ZoomableImage({
         alignItems: "center",
         justifyContent: "center",
         cursor: isLoading ? "default" : "zoom-in",
-        margin: "12px 0",
+        margin: "12px auto",
         borderRadius: "20px",
         overflow: "hidden",
         background: "#f8fafc",
@@ -447,8 +470,28 @@ function ZoomableImage({
       onClick={handleClick}
     >
       {isLoading && !hasError && (
-        <div className="media-loader">
-          <div className="spinner" />
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 5,
+            pointerEvents: "none",
+          }}
+        >
+          <div
+            style={{
+              width: 34,
+              height: 34,
+              margin: 0,
+              border: "3px solid rgba(0, 123, 255, 0.12)",
+              borderTopColor: "#007bff",
+              borderRadius: "50%",
+              animation: "mediaSpin 0.8s linear infinite",
+            }}
+          />
         </div>
       )}
 
@@ -641,22 +684,6 @@ export default function MediaRenderer({
           @keyframes mediaAppear {
             from { opacity: 0; transform: translateY(5px); }
             to   { opacity: 1; transform: translateY(0); }
-          }
-          .media-loader {
-            position: absolute;
-            inset: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 5;
-          }
-          .spinner {
-            width: 30px;
-            height: 30px;
-            border: 3px solid rgba(0, 123, 255, 0.1);
-            border-top-color: #007bff;
-            border-radius: 50%;
-            animation: mediaSpin 0.8s linear infinite;
           }
           @keyframes mediaSpin { to { transform: rotate(360deg); } }
           @keyframes spin      { to { transform: rotate(360deg); } }

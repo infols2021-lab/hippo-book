@@ -125,18 +125,6 @@ export default function AssignmentsTab({ onChanged }: Props) {
             setSelectedMaterial(demoMats[0]);
           }
         }
-        else if (selectedProjectId === "legacy_olympiad") {
-          const [tRes, cRes] = await Promise.all([
-            fetch("/api/admin/textbooks", { cache: "no-store" }),
-            fetch("/api/admin/crosswords", { cache: "no-store" })
-          ]);
-          const tJson = await tRes.json();
-          const cJson = await cRes.json();
-
-          const tb = (tJson.textbooks || []).map((x: any) => ({ ...x, branch_type: "olympiad", kind: "textbook", id: String(x.id) }));
-          const cw = (cJson.crosswords || []).map((x: any) => ({ ...x, branch_type: "olympiad", kind: "crossword", id: String(x.id) }));
-          setMaterials([...tb, ...cw]);
-        } 
         else if (selectedProjectId === "legacy_gatehouse") {
           const mRes = await fetch("/api/admin/materials?branch_type=gatehouse", { cache: "no-store" });
           const mJson = await mRes.json();
@@ -360,8 +348,7 @@ export default function AssignmentsTab({ onChanged }: Props) {
             <optgroup label="Новые динамические проекты">
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </optgroup>
-            <optgroup label="Легаси (старая структура)">
-              <option value="legacy_olympiad">Олимпиада (Учебники и Кроссворды)</option>
+            <optgroup label="Экзамены Gatehouse Awards">
               <option value="legacy_gatehouse">Экзамены Gatehouse Awards</option>
             </optgroup>
           </select>
@@ -392,18 +379,7 @@ export default function AssignmentsTab({ onChanged }: Props) {
             className="w-full border-2 rounded-xl px-4 py-2.5 outline-none bg-white font-bold disabled:opacity-50 disabled:bg-gray-100"
           >
             <option value="">-- Выберите материал --</option>
-            {selectedProjectId === "legacy_olympiad" ? (
-              <>
-                <optgroup label="Учебники">
-                  {materials.filter(m => m.kind === "textbook").map(m => <option key={`tb-${m.id}`} value={m.id}>{m.title}</option>)}
-                </optgroup>
-                <optgroup label="Кроссворды">
-                  {materials.filter(m => m.kind === "crossword").map(m => <option key={`cw-${m.id}`} value={m.id}>{m.title}</option>)}
-                </optgroup>
-              </>
-            ) : (
-              materials.map(m => <option key={`mat-${m.id}`} value={m.id}>{m.title}</option>)
-            )}
+            {materials.map(m => <option key={`mat-${m.id}`} value={m.id}>{m.title}</option>)}
           </select>
         </div>
 

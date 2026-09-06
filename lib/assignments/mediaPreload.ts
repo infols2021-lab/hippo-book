@@ -192,6 +192,28 @@ export function ensureMediaPreconnect() {
   }
 }
 
+const IMAGE_FILE_RE = /\.(avif|gif|jpe?g|png|svg|webp)(\?|$)/i;
+
+/** Является ли элемент media-массива картинкой (по типу или расширению URL). */
+function isImageMediaItem(item: any): boolean {
+  if (!item || typeof item !== "object") return false;
+  const type = String(item.type ?? "").toLowerCase();
+  if (type === "image") return true;
+  if (type === "audio" || type === "pdf") return false;
+  return typeof item.url === "string" && IMAGE_FILE_RE.test(item.url);
+}
+
+/** Собирает image/медиа-картинки объекта (вопрос/вариант/пара). */
+function collectImageUrls(urls: Set<string>, value: any) {
+  if (!value || typeof value !== "object") return;
+  if (typeof value.image === "string") pushUrl(urls, value.image);
+  if (Array.isArray(value.media)) {
+    for (const item of value.media) {
+      if (isImageMediaItem(item) && typeof item.url === "string") pushUrl(urls, item.url);
+    }
+  }
+}
+
 /**
  * «Мгновенные картинки»: собирает все URL изображений из массива вопросов и
  * ждёт их декодирования. Поля поиска:
@@ -199,23 +221,24 @@ export function ensureMediaPreconnect() {
  * - внутри каждого `options` (вариант ответа);
  * - внутри каждой пары `pairs` (левая и правая сторона).
  * Для каждого URL создаёт `new Image()` и возвращает промис через `img.decode()`.
+ * Через `options.onProgress` отдаёт прогресс (загружено / всего).
  */
-export async function preloadAssignmentImages(questions: any[]): Promise<void> {
+export async function preloadAssignmentImages(
+  questions: any[],
+  options?: { onProgress?: (loaded: number, total: number) => void }
+): Promise<void> {
+  const onProgress = options?.onProgress;
   const urls = new Set<string>();
 
   for (const question of Array.isArray(questions) ? questions : []) {
     if (!question || typeof question !== "object") continue;
 
-    // Корень вопроса
-    if (typeof question.image === "string") pushUrl(urls, question.image);
-    collectFromMedia(urls, question.media);
+    collectImageUrls(urls, question);
 
     // options — image и media у каждого варианта
     if (Array.isArray(question.options)) {
       for (const opt of question.options) {
-        if (!opt || typeof opt !== "object") continue;
-        if (typeof opt.image === "string") pushUrl(urls, opt.image);
-        collectFromMedia(urls, opt.media);
+        collectImageUrls(urls, opt);
       }
     }
 
@@ -223,40 +246,38 @@ export async function preloadAssignmentImages(questions: any[]): Promise<void> {
     if (Array.isArray(question.pairs)) {
       for (const pair of question.pairs) {
         if (!pair || typeof pair !== "object") continue;
-        if (typeof pair.image === "string") pushUrl(urls, pair.image);
-        collectFromMedia(urls, pair.media);
-
-        const left = pair.left;
-        if (left && typeof left === "object") {
-          if (typeof left.image === "string") pushUrl(urls, left.image);
-          collectFromMedia(urls, left.media);
-        }
-
-        const right = pair.right;
-        if (right && typeof right === "object") {
-          if (typeof right.image === "string") pushUrl(urls, right.image);
-          collectFromMedia(urls, right.media);
-        }
+        collectImageUrls(urls, pair);
+        collectImageUrls(urls, pair.left);
+        collectImageUrls(urls, pair.right);
       }
     }
   }
 
   if (typeof window === "undefined" || typeof Image === "undefined") return;
 
-  const imageUrls = Array.from(urls).filter(isImageUrl);
+  const imageUrls = Array.from(urls);
+  const total = imageUrls.length;
+  let loaded = 0;
+
+  onProgress?.(0, total);
 
   await Promise.all(
     imageUrls.map(
       (url) =>
         new Promise<void>((resolve) => {
+          const finish = () => {
+            loaded += 1;
+            onProgress?.(loaded, total);
+            resolve();
+          };
           const img = new Image();
           img.decoding = "async";
           img.src = url;
           if (typeof img.decode === "function") {
-            img.decode().then(() => resolve()).catch(() => resolve());
+            img.decode().then(finish).catch(finish);
           } else {
-            img.onload = () => resolve();
-            img.onerror = () => resolve();
+            img.onload = finish;
+            img.onerror = finish;
           }
         })
     )

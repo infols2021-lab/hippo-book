@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import type { ReviewItem, TestOption, ReviewPart } from "@/lib/assignments/types";
 import { isVariantMatch } from "@/lib/assignments/scoring";
+import { getImageUrl } from "@/lib/assignments/image";
 import QuestionRichText from "./QuestionRichText";
 import MediaRenderer from "./MediaRenderer";
 import { ImageMapRenderer } from "./QuestionImageMap";
@@ -169,7 +170,7 @@ function TestOptionsReview({
                 {opt.media[0].url?.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i) ||
                 opt.media[0].type?.startsWith("image") ? (
                   <img
-                    src={opt.media[0].url}
+                    src={getImageUrl(opt.media[0].url)}
                     alt=""
                     decoding="async"
                     loading="eager"

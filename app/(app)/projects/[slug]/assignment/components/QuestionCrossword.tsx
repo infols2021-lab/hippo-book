@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getImageUrl } from "@/lib/assignments/image";
-import MediaRenderer from "./MediaRenderer";
 
 type Dir = "across" | "down";
 
@@ -227,6 +226,22 @@ export default function QuestionCrossword({
   const [dir, setDir] = useState<Dir>("across");
   const lastClickRef = useRef<{ r: number; c: number; t: number } | null>(null);
 
+  // Автоповтор картинки кроссворда (первый запрос к хранилищу может оборваться)
+  const [cwImgRetry, setCwImgRetry] = useState(0);
+
+  const cwImageUrl = useMemo(() => {
+    const base = getImageUrl(question?.image);
+    if (!base) return "";
+    return cwImgRetry > 0
+      ? `${base}${base.includes("?") ? "&" : "?"}retry=${cwImgRetry}`
+      : base;
+  }, [question?.image, cwImgRetry]);
+
+  // Сброс повторов при смене изображения (переход к другому вопросу)
+  useEffect(() => {
+    setCwImgRetry(0);
+  }, [question?.image]);
+
   function isHardBlocked(r: number, c: number) {
     return blocks.some((b) => b.row === r && b.col === c);
   }
@@ -356,13 +371,20 @@ export default function QuestionCrossword({
       {question?.image && !(question?.media?.length) ? (
         <div className="cw-card cw-image-card">
           <img
+            key={cwImgRetry}
             className="cw-image"
-            src={getImageUrl(question.image)}
+            src={cwImageUrl}
             alt="Изображение к кроссворду"
             decoding="async"
             loading="eager"
             onClick={() => onOpenImage?.(getImageUrl(question.image))}
-            onError={(e) => (e.currentTarget.style.display = "none")}
+            onError={(e) => {
+              if (cwImgRetry < 2) {
+                window.setTimeout(() => setCwImgRetry((c) => c + 1), 250);
+              } else {
+                e.currentTarget.style.display = "none";
+              }
+            }}
           />
           <div className="cw-image-hint">Нажмите на изображение для увеличения</div>
         </div>
