@@ -49,20 +49,16 @@ export async function GET(req: NextRequest) {
     const users = (usersRaw ?? []) as ProfileRow[];
     const userIds = users.map((u) => u.id);
 
-    let hasSet = new Set<string>();
+    const hasSet = new Set<string>();
 
     if (userIds.length) {
-      const [{ data: ta, error: taErr }, { data: ca, error: caErr }, { data: ma, error: maErr }] = await Promise.all([
-        supabase.from("textbook_access").select("user_id").in("user_id", userIds),
-        supabase.from("crossword_access").select("user_id").in("user_id", userIds),
-        supabase.from("material_access").select("user_id").in("user_id", userIds),
-      ]);
+      const { data: ma, error: maErr } = await supabase
+        .from("material_access")
+        .select("user_id")
+        .in("user_id", userIds);
 
-      const err = taErr || caErr || maErr;
-      if (err) return fail(err.message, 500, "DB_ERROR");
+      if (maErr) return fail(maErr.message, 500, "DB_ERROR");
 
-      for (const r of ta ?? []) hasSet.add(String((r as any).user_id));
-      for (const r of ca ?? []) hasSet.add(String((r as any).user_id));
       for (const r of ma ?? []) hasSet.add(String((r as any).user_id));
     }
 

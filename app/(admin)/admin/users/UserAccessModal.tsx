@@ -39,13 +39,9 @@ async function apiPost<T>(url: string, body: any): Promise<ApiOk<T>> {
 /* ================= types ================= */
 
 type AccessLoad = {
-  textbooks: Array<{ id: string; title: string; class_level: string[] | null }>;
-  crosswords: Array<{ id: string; title: string; class_level: string[] | null }>;
   materials: Array<{ id: string; title: string; project_tab_id: string | null; target_levels: string[] | null; class_levels: string[] | null }>;
   projects: Array<{ id: string; name: string; slug: string }>;
   project_tabs: Array<{ id: string; title: string; project_id: string }>;
-  selectedTextbookIds: string[];
-  selectedCrosswordIds: string[];
   selectedMaterialIds: string[];
 };
 
@@ -62,13 +58,9 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
   const userId = user?.id ?? null;
   const userName = user?.full_name || user?.email || "Пользователь";
 
-  const [section, setSection] = useState<"projects" | "legacy">("projects");
-
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const [textbooks, setTextbooks] = useState<AccessLoad["textbooks"]>([]);
-  const [crosswords, setCrosswords] = useState<AccessLoad["crosswords"]>([]);
   const [materials, setMaterials] = useState<AccessLoad["materials"]>([]);
   const [projects, setProjects] = useState<AccessLoad["projects"]>([]);
   const [tabs, setTabs] = useState<AccessLoad["project_tabs"]>([]);
@@ -76,8 +68,6 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [selectedTabId, setSelectedTabId] = useState<string>("");
 
-  const [tbChecked, setTbChecked] = useState<Set<string>>(new Set());
-  const [cwChecked, setCwChecked] = useState<Set<string>>(new Set());
   const [materialChecked, setMaterialChecked] = useState<Set<string>>(new Set());
 
   const title = useMemo(() => `🔐 Управление доступом — ${userName}`, [userName]);
@@ -95,14 +85,10 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
         const data = await apiGet<AccessLoad>(`/api/admin/users/${encodeURIComponent(userId)}`);
         if (cancelled) return;
 
-        setTextbooks(data.textbooks ?? []);
-        setCrosswords(data.crosswords ?? []);
         setMaterials(data.materials ?? []);
         setProjects(data.projects ?? []);
         setTabs(data.project_tabs ?? []);
 
-        setTbChecked(new Set((data.selectedTextbookIds ?? []).map(String)));
-        setCwChecked(new Set((data.selectedCrosswordIds ?? []).map(String)));
         setMaterialChecked(new Set((data.selectedMaterialIds ?? []).map(String)));
 
         if (data.projects && data.projects.length > 0) {
@@ -138,8 +124,6 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
     try {
       const payload = {
         user_id: userId,
-        textbook_ids: Array.from(tbChecked),
-        crossword_ids: Array.from(cwChecked),
         material_ids: Array.from(materialChecked),
       };
 
@@ -160,28 +144,11 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
 
   return (
     <Modal open={open} onClose={onClose} title={title} maxWidth={960}>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
-        <button
-          className={section === "projects" ? "btn small" : "btn small ghost"}
-          type="button"
-          onClick={() => setSection("projects")}
-        >
-          📁 Проекты и Материалы
-        </button>
-        <button
-          className={section === "legacy" ? "btn small" : "btn small ghost"}
-          type="button"
-          onClick={() => setSection("legacy")}
-        >
-          🏛️ Легаси (Старые учебники)
-        </button>
-      </div>
-
       {loading ? <LoadingBlock text="Загружаем доступы..." /> : null}
       {err ? <ErrorBox message={err} retryMode="none" /> : null}
 
       {/* =========== НОВАЯ АРХИТЕКТУРА (ПРОЕКТЫ И ТАБЫ) =========== */}
-      {!loading && section === "projects" && (
+      {!loading && (
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <div>
@@ -269,85 +236,6 @@ export default function UserAccessModal({ open, user, onClose, onSaved }: Props)
                         </div>
                         <div className="small-muted" style={{ fontSize: 12, marginTop: 2 }}>
                           {levels.length ? levels.join(", ") : "уровни не указаны"}
-                        </div>
-                      </div>
-                    </label>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* =========== СТАРАЯ АРХИТЕКТУРА (ЛЕГАСИ) =========== */}
-      {!loading && section === "legacy" && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          <div>
-            <h3 style={{ marginTop: 0, fontSize: 15, fontWeight: 800, color: "#0f172a" }}>📚 Учебники</h3>
-            <div style={{ display: "grid", gap: 10, maxHeight: 380, overflowY: "auto", paddingRight: 4 }}>
-              {textbooks.length === 0 ? (
-                <div style={{ padding: 16, textAlign: "center", background: "#f8fafc", borderRadius: 12, border: "1px dashed #cbd5e1", color: "#64748b", fontSize: 13 }}>
-                  Нет учебников
-                </div>
-              ) : (
-                textbooks.map((t) => {
-                  const checked = tbChecked.has(String(t.id));
-                  return (
-                    <label key={t.id} style={{
-                      display: "flex", gap: 12, alignItems: "center", padding: "12px 14px",
-                      borderRadius: 12, border: checked ? "1px solid #0ea5e9" : "1px solid #e2e8f0",
-                      background: checked ? "#f0f9ff" : "#f8fafc", cursor: "pointer", transition: "all 0.15s ease"
-                    }}>
-                      <input 
-                        type="checkbox" 
-                        checked={checked} 
-                        style={{ width: 18, height: 18, accentColor: "#0ea5e9" }}
-                        onChange={(e) => {
-                          setTbChecked(prev => { const n = new Set(prev); e.target.checked ? n.add(t.id) : n.delete(t.id); return n; });
-                        }} 
-                      />
-                      <div>
-                        <div style={{ fontWeight: 800, color: checked ? "#0284c7" : "#0f172a", fontSize: 14 }}>{t.title}</div>
-                        <div className="small-muted" style={{ fontSize: 12, marginTop: 2 }}>
-                          {t.class_level?.join(", ") || "без класса"}
-                        </div>
-                      </div>
-                    </label>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          <div>
-            <h3 style={{ marginTop: 0, fontSize: 15, fontWeight: 800, color: "#0f172a" }}>🧩 Кроссворды</h3>
-            <div style={{ display: "grid", gap: 10, maxHeight: 380, overflowY: "auto", paddingRight: 4 }}>
-              {crosswords.length === 0 ? (
-                <div style={{ padding: 16, textAlign: "center", background: "#f8fafc", borderRadius: 12, border: "1px dashed #cbd5e1", color: "#64748b", fontSize: 13 }}>
-                  Нет кроссвордов
-                </div>
-              ) : (
-                crosswords.map((c) => {
-                  const checked = cwChecked.has(String(c.id));
-                  return (
-                    <label key={c.id} style={{
-                      display: "flex", gap: 12, alignItems: "center", padding: "12px 14px",
-                      borderRadius: 12, border: checked ? "1px solid #0ea5e9" : "1px solid #e2e8f0",
-                      background: checked ? "#f0f9ff" : "#f8fafc", cursor: "pointer", transition: "all 0.15s ease"
-                    }}>
-                      <input 
-                        type="checkbox" 
-                        checked={checked} 
-                        style={{ width: 18, height: 18, accentColor: "#0ea5e9" }}
-                        onChange={(e) => {
-                          setCwChecked(prev => { const n = new Set(prev); e.target.checked ? n.add(c.id) : n.delete(c.id); return n; });
-                        }} 
-                      />
-                      <div>
-                        <div style={{ fontWeight: 800, color: checked ? "#0284c7" : "#0f172a", fontSize: 14 }}>{c.title}</div>
-                        <div className="small-muted" style={{ fontSize: 12, marginTop: 2 }}>
-                          {c.class_level?.join(", ") || "без класса"}
                         </div>
                       </div>
                     </label>

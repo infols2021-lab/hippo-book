@@ -54,8 +54,7 @@ export type OlympiadMaterialsData = {
   crosswords: OlympiadCrosswordRow[];
   assignments: OlympiadAssignmentLink[];
   userProgress: OlympiadProgressRow[];
-  textbookAccess: { textbook_id: string }[];
-  crosswordAccess: { crossword_id: string }[];
+  materialAccess: { material_id: string }[];
 };
 
 export type OlympiadMaterialProgressItem = {
@@ -211,8 +210,7 @@ export async function loadOlympiadMaterialsData(ctx: DataAuthContext): Promise<O
     { data: crosswordRows, error: crosswordError },
     { data: assignmentRows, error: assignmentError },
     { data: progressRows, error: progressError },
-    { data: textbookAccessRows, error: textbookAccessError },
-    { data: crosswordAccessRows, error: crosswordAccessError },
+    { data: materialAccessRows, error: materialAccessError },
   ] = await Promise.all([
     supabase
       .from("textbooks")
@@ -241,9 +239,7 @@ export async function loadOlympiadMaterialsData(ctx: DataAuthContext): Promise<O
       .select("assignment_id, is_completed, score, completed_at")
       .eq("user_id", user.id),
 
-    supabase.from("textbook_access").select("textbook_id").eq("user_id", user.id),
-
-    supabase.from("crossword_access").select("crossword_id").eq("user_id", user.id),
+    supabase.from("material_access").select("material_id").eq("user_id", user.id),
   ]);
 
   const error =
@@ -251,8 +247,7 @@ export async function loadOlympiadMaterialsData(ctx: DataAuthContext): Promise<O
     crosswordError ||
     assignmentError ||
     progressError ||
-    textbookAccessError ||
-    crosswordAccessError;
+    materialAccessError;
 
   if (error) {
     throw new Error(error.message);
@@ -263,25 +258,19 @@ export async function loadOlympiadMaterialsData(ctx: DataAuthContext): Promise<O
     crosswords: Array.isArray(crosswordRows) ? crosswordRows.map(normalizeCrossword) : [],
     assignments: Array.isArray(assignmentRows) ? assignmentRows.map(normalizeAssignmentLink) : [],
     userProgress: Array.isArray(progressRows) ? progressRows.map(normalizeProgressRow) : [],
-    textbookAccess: Array.isArray(textbookAccessRows)
-      ? textbookAccessRows
-          .map((row: any) => ({ textbook_id: String(row?.textbook_id ?? "") }))
-          .filter((row) => row.textbook_id)
-      : [],
-    crosswordAccess: Array.isArray(crosswordAccessRows)
-      ? crosswordAccessRows
-          .map((row: any) => ({ crossword_id: String(row?.crossword_id ?? "") }))
-          .filter((row) => row.crossword_id)
+    materialAccess: Array.isArray(materialAccessRows)
+      ? materialAccessRows
+          .map((row: any) => ({ material_id: String(row?.material_id ?? "") }))
+          .filter((row) => row.material_id)
       : [],
   };
 }
 
 export function buildOlympiadProfileProgress(data: OlympiadMaterialsData): OlympiadProfileProgressData {
-  const textbookAccess = new Set(data.textbookAccess.map((item) => item.textbook_id));
-  const crosswordAccess = new Set(data.crosswordAccess.map((item) => item.crossword_id));
+  const materialAccess = new Set(data.materialAccess.map((item) => item.material_id));
 
-  const availableTextbooks = data.textbooks.filter((item) => item.is_available || textbookAccess.has(item.id));
-  const availableCrosswords = data.crosswords.filter((item) => item.is_available || crosswordAccess.has(item.id));
+  const availableTextbooks = data.textbooks.filter((item) => item.is_available || materialAccess.has(item.id));
+  const availableCrosswords = data.crosswords.filter((item) => item.is_available || materialAccess.has(item.id));
 
   const completedSet = new Set(
     data.userProgress
@@ -394,10 +383,10 @@ export async function loadTextbookPageData(
   const textbook = normalizeTextbook(textbookRow);
 
   const { data: accessRow, error: accessError } = await supabase
-    .from("textbook_access")
+    .from("material_access")
     .select("id")
     .eq("user_id", user.id)
-    .eq("textbook_id", id)
+    .eq("material_id", id)
     .maybeSingle();
 
   if (accessError) {
@@ -480,10 +469,10 @@ export async function loadCrosswordPageData(
   const crossword = normalizeCrossword(crosswordRow);
 
   const { data: accessRow, error: accessError } = await supabase
-    .from("crossword_access")
+    .from("material_access")
     .select("id")
     .eq("user_id", user.id)
-    .eq("crossword_id", id)
+    .eq("material_id", id)
     .maybeSingle();
 
   if (accessError) {

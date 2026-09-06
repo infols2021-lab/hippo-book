@@ -325,6 +325,8 @@ export default function ImageModal({ open, src, onClose }: Props) {
         ref={imageRef}
         src={src}
         alt="Fullscreen view"
+        decoding="async"
+        loading="eager"
         onMouseDown={handleMouseDown}
         draggable={false}
         style={{

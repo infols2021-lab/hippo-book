@@ -483,7 +483,7 @@ function ZoomableImage({
           alt={name || "Task Image"}
           onLoad={handleLoad}
           onError={handleError}
-          loading={priority ? "eager" : "lazy"}
+          loading="eager"
           decoding="async"
           fetchPriority={priority ? "high" : "auto"}
           style={{

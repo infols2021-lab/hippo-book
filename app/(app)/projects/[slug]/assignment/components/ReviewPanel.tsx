@@ -171,6 +171,8 @@ function TestOptionsReview({
                   <img
                     src={opt.media[0].url}
                     alt=""
+                    decoding="async"
+                    loading="eager"
                     style={{
                       maxWidth: "100px",
                       maxHeight: "100px",

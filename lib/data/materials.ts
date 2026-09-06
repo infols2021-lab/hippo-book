@@ -305,8 +305,6 @@ export async function loadProjectMaterialsData(
     { data: crosswordRows, error: crosswordsError },
     { data: progressRows, error: progressError },
     { data: accessRows, error: accessError },
-    { data: tbAccessRows, error: tbAccessError },
-    { data: cwAccessRows, error: cwAccessError },
   ] = await Promise.all([
     materialsQuery,
     demoMaterialsQuery,
@@ -321,12 +319,6 @@ export async function loadProjectMaterialsData(
       .select("assignment_id, is_completed, score, completed_at")
       .eq("user_id", user.id),
     supabase.from("material_access").select("material_id").eq("user_id", user.id),
-    shouldFetchTextbooks
-      ? supabase.from("textbook_access").select("textbook_id").eq("user_id", user.id)
-      : Promise.resolve({ data: [], error: null }),
-    shouldFetchCrosswords
-      ? supabase.from("crossword_access").select("crossword_id").eq("user_id", user.id)
-      : Promise.resolve({ data: [], error: null }),
   ]);
 
   const materialsMap = new Map<string, ExtendedMaterialDbRow>();
@@ -395,8 +387,6 @@ export async function loadProjectMaterialsData(
     assignmentsError?.message ||
     progressError?.message ||
     accessError?.message ||
-    tbAccessError?.message ||
-    cwAccessError?.message ||
     null;
 
   const assignments: ProjectAssignmentLink[] = Array.isArray(assignmentRows)
@@ -429,16 +419,6 @@ export async function loadProjectMaterialsData(
   if (Array.isArray(accessRows)) {
     for (const r of accessRows) {
       if (r?.material_id) accessIds.add(String(r.material_id));
-    }
-  }
-  if (Array.isArray(tbAccessRows)) {
-    for (const r of tbAccessRows) {
-      if (r?.textbook_id) accessIds.add(String(r.textbook_id));
-    }
-  }
-  if (Array.isArray(cwAccessRows)) {
-    for (const r of cwAccessRows) {
-      if (r?.crossword_id) accessIds.add(String(r.crossword_id));
     }
   }
 
@@ -525,14 +505,10 @@ export async function loadProjectMaterialPageData(
 
   const [
     { data: accessRow },
-    { data: tbAccessRow },
-    { data: cwAccessRow },
     { data: assignmentRows, error: assignmentsError },
     { data: progressRows, error: progressError },
   ] = await Promise.all([
     supabase.from("material_access").select("id").eq("user_id", user.id).eq("material_id", id).maybeSingle(),
-    supabase.from("textbook_access").select("id").eq("user_id", user.id).eq("textbook_id", id).maybeSingle(),
-    supabase.from("crossword_access").select("id").eq("user_id", user.id).eq("crossword_id", id).maybeSingle(),
     supabase
       .from("assignments")
       .select("id, title, order_index, content, created_at")
@@ -546,7 +522,7 @@ export async function loadProjectMaterialPageData(
   ]);
 
   const hasAccess = Boolean(
-    material.is_available || material.is_demo || accessRow || tbAccessRow || cwAccessRow,
+    material.is_available || material.is_demo || accessRow,
   );
 
   // Если материал секретный и у пользователя НЕТ доступа — отклоняем запрос

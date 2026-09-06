@@ -23,6 +23,7 @@ import { getImageUrl } from "@/lib/assignments/image";
 import {
   ensureMediaPreconnect,
   getQuestionMediaUrls,
+  preloadAssignmentImages,
   warmAssignmentMediaCache,
 } from "@/lib/assignments/mediaPreload";
 import type { FinalStats, ReviewItem, QuestionAny, AssignmentData, MaterialData } from "@/lib/assignments/types";
@@ -196,6 +197,7 @@ export default function AssignmentClient({
   const { stage, advanceTour } = useTour();
 
   const [loading, setLoading] = useState(true);
+  const [isPreloading, setIsPreloading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [assignment, setAssignment] = useState<AssignmentData | null>(null);
   
@@ -375,6 +377,7 @@ export default function AssignmentClient({
   async function load() {
     try {
       setLoading(true);
+      setIsPreloading(true);
       setErr(null);
 
       const res = await fetch(`/api/assignment-data/${encodeURIComponent(assignmentId)}`, { cache: "no-store" });
@@ -388,6 +391,7 @@ export default function AssignmentClient({
       setAssignment(data);
 
       const isIntro = data?.assignment_type === "intro" || data?.content?.mode === "informational";
+      let nextQuestions: QuestionAny[] = [];
 
       if (isIntro) {
         setAssignmentMode("informational");
@@ -396,7 +400,7 @@ export default function AssignmentClient({
         warmAssignmentMediaCache({ blocks: nextBlocks });
       } else {
         setAssignmentMode("interactive");
-        const nextQuestions = normalizeQuestions(data?.content?.questions);
+        nextQuestions = normalizeQuestions(data?.content?.questions);
         setQuestions(nextQuestions);
         warmAssignmentMediaCache({ questions: nextQuestions });
       }
@@ -426,8 +430,14 @@ export default function AssignmentClient({
       setFinalStats(null);
       setReviewItems([]);
       setGatehouseRecommendation(null);
+
+      // Мгновенные картинки: ждём декодирование всех изображений задания
+      await preloadAssignmentImages(nextQuestions);
+
+      setIsPreloading(false);
       setLoading(false);
     } catch (e: any) {
+      setIsPreloading(false);
       setLoading(false);
       setErr(e?.message || "Ошибка загрузки задания");
     }
@@ -488,7 +498,8 @@ export default function AssignmentClient({
       !completedScreen &&
       !isViewMode &&
       assignmentMode === "interactive" &&
-      !loading,
+      !loading &&
+      !isPreloading,
   );
 
   useEffect(() => {
@@ -763,11 +774,117 @@ export default function AssignmentClient({
 
   const answeredCount = questions.filter((q, i) => isQuestionAnswered(q, getAnswerForQuestion(i))).length;
 
-  if (loading)
+  if (loading || isPreloading)
     return (
-      <div className="loader-container" style={{ background: theme.bg }}>
-        <div className="premium-spinner" style={{ borderColor: theme.primary, borderTopColor: "transparent" }} />
-        <p style={{ color: theme.primary, fontWeight: 600, marginTop: "20px" }}>Загружаем материалы...</p>
+      <div className="preload-screen">
+        <style jsx>{`
+          .preload-screen {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(160deg, #f8fafc 0%, #eef2f7 100%);
+            padding: 24px;
+          }
+          .preload-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 28px;
+            padding: 48px 56px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 24px;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.06);
+            max-width: 420px;
+            text-align: center;
+          }
+          .preload-pulse {
+            position: relative;
+            width: 72px;
+            height: 72px;
+            flex-shrink: 0;
+          }
+          .preload-pulse::before,
+          .preload-pulse::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            background: rgba(100, 116, 139, 0.18);
+            animation: preloadPulse 2s ease-out infinite;
+          }
+          .preload-pulse::after {
+            animation-delay: 1s;
+          }
+          .preload-pulse-dot {
+            position: absolute;
+            inset: 26px;
+            border-radius: 50%;
+            background: #94a3b8;
+            box-shadow: 0 0 0 6px rgba(148, 163, 184, 0.12);
+          }
+          @keyframes preloadPulse {
+            0% {
+              transform: scale(0.5);
+              opacity: 0.9;
+            }
+            100% {
+              transform: scale(1.9);
+              opacity: 0;
+            }
+          }
+          .preload-title {
+            font-size: 17px;
+            font-weight: 700;
+            color: #1e293b;
+            letter-spacing: -0.01em;
+          }
+          .preload-subtitle {
+            margin-top: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #94a3b8;
+          }
+          .preload-shimmer {
+            width: 180px;
+            height: 6px;
+            margin: 18px auto 0;
+            border-radius: 999px;
+            overflow: hidden;
+            background: #eef2f7;
+            position: relative;
+          }
+          .preload-shimmer::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            transform: translateX(-100%);
+            background: linear-gradient(
+              90deg,
+              transparent,
+              rgba(148, 163, 184, 0.35),
+              transparent
+            );
+            animation: preloadShimmer 1.6s ease-in-out infinite;
+          }
+          @keyframes preloadShimmer {
+            100% {
+              transform: translateX(100%);
+            }
+          }
+        `}</style>
+
+        <div className="preload-card">
+          <div className="preload-pulse">
+            <div className="preload-pulse-dot" />
+          </div>
+          <div>
+            <div className="preload-title">Подготовка окружения...</div>
+            <div className="preload-subtitle">Синхронизация медиафайлов...</div>
+            <div className="preload-shimmer" />
+          </div>
+        </div>
       </div>
     );
 

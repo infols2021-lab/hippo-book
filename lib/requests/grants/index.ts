@@ -75,32 +75,6 @@ export async function grantAccessForRequest(
     .select("id, title, material_kind, legacy_source_table, legacy_source_id")
     .in("id", requestedIds);
 
-  const foundMaterialIds = new Set((materials || []).map((m) => m.id));
-  const missingIds = requestedIds.filter((id) => !foundMaterialIds.has(id));
-
-  // 2. Ищем оставшиеся ID в легаси-таблице textbooks
-  let textbooks: any[] = [];
-  if (missingIds.length > 0) {
-    const { data: tbData } = await supabase
-      .from("textbooks")
-      .select("id, title")
-      .in("id", missingIds);
-    if (tbData) textbooks = tbData;
-  }
-
-  // 3. Ищем оставшиеся ID в легаси-таблице crosswords
-  const foundTbIds = new Set(textbooks.map((t) => t.id));
-  const missingAfterTb = missingIds.filter((id) => !foundTbIds.has(id));
-
-  let crosswords: any[] = [];
-  if (missingAfterTb.length > 0) {
-    const { data: cwData } = await supabase
-      .from("crosswords")
-      .select("id, title")
-      .in("id", missingAfterTb);
-    if (cwData) crosswords = cwData;
-  }
-
   // ---- Выдача для материалов из таблицы materials ----
   for (const mat of materials || []) {
     const { error: upsertErr } = await supabase
@@ -114,23 +88,6 @@ export async function grantAccessForRequest(
         },
         { onConflict: "user_id,material_id" },
       );
-
-    // Связка с легаси-таблицами доступов при наличии
-    if (mat.legacy_source_table === "textbooks" && mat.legacy_source_id) {
-      await supabase
-        .from("textbook_access")
-        .upsert(
-          { user_id: r.user_id, textbook_id: mat.legacy_source_id },
-          { onConflict: "user_id,textbook_id" },
-        );
-    } else if (mat.legacy_source_table === "crosswords" && mat.legacy_source_id) {
-      await supabase
-        .from("crossword_access")
-        .upsert(
-          { user_id: r.user_id, crossword_id: mat.legacy_source_id },
-          { onConflict: "user_id,crossword_id" },
-        );
-    }
 
     if (!upsertErr) {
       grantedLabels.push(`📘 ${mat.title}`);
@@ -154,59 +111,6 @@ export async function grantAccessForRequest(
       });
     }
   }
-
-  // ---- Выдача для материалов из легаси-таблицы textbooks ----
-  for (const tb of textbooks) {
-    const { error: upsertErr } = await supabase
-      .from("textbook_access")
-      .upsert(
-        { user_id: r.user_id, textbook_id: tb.id },
-        { onConflict: "user_id,textbook_id" },
-      );
-
-    if (!upsertErr) {
-      grantedLabels.push(`📚 ${tb.title}`);
-      grantsToStore.push({
-        request_id: r.id,
-        user_id: r.user_id,
-        kind: "textbook",
-        item_id: tb.id,
-        title: tb.title,
-        granted_by: adminId,
-        granted_at: nowISO,
-        branch_type: r.branch_type || "olympiad",
-        material_id: tb.id,
-        material_kind: "textbook",
-      });
-    }
-  }
-
-  // ---- Выдача для материалов из легаси-таблицы crosswords ----
-  for (const cw of crosswords) {
-    const { error: upsertErr } = await supabase
-      .from("crossword_access")
-      .upsert(
-        { user_id: r.user_id, crossword_id: cw.id },
-        { onConflict: "user_id,crossword_id" },
-      );
-
-    if (!upsertErr) {
-      grantedLabels.push(`🧩 ${cw.title}`);
-      grantsToStore.push({
-        request_id: r.id,
-        user_id: r.user_id,
-        kind: "crossword",
-        item_id: cw.id,
-        title: cw.title,
-        granted_by: adminId,
-        granted_at: nowISO,
-        branch_type: r.branch_type || "olympiad",
-        material_id: cw.id,
-        material_kind: "crossword",
-      });
-    }
-  }
-
 
   // Create unread notifications for granted materials
   try {
@@ -378,23 +282,6 @@ export async function revokeAccessForRequest(
       .delete()
       .eq("user_id", r.user_id)
       .eq("material_id", t.item_id);
-
-    // Удаление из легаси-таблиц при наличии
-    if (t.kind === "textbook") {
-      await supabase
-        .from("textbook_access")
-        .delete()
-        .eq("user_id", r.user_id)
-        .eq("textbook_id", t.item_id);
-    }
-
-    if (t.kind === "crossword") {
-      await supabase
-        .from("crossword_access")
-        .delete()
-        .eq("user_id", r.user_id)
-        .eq("crossword_id", t.item_id);
-    }
   }
 
   const { error: delHistory } = await supabase

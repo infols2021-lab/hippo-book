@@ -359,6 +359,8 @@ export default function QuestionCrossword({
             className="cw-image"
             src={getImageUrl(question.image)}
             alt="Изображение к кроссворду"
+            decoding="async"
+            loading="eager"
             onClick={() => onOpenImage?.(getImageUrl(question.image))}
             onError={(e) => (e.currentTarget.style.display = "none")}
           />

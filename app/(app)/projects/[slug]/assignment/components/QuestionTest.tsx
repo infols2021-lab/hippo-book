@@ -176,6 +176,8 @@ export default function QuestionTest({ question, value, onChange, disabled }: Pr
                       <img
                         src={opt.media[0].url}
                         alt="Медиавариант"
+                        decoding="async"
+                        loading="eager"
                         style={{
                           maxWidth: "140px",
                           maxHeight: "140px",

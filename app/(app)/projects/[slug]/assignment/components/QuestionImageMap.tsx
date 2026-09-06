@@ -166,6 +166,8 @@ export function ImageMapRenderer({
         className="imagemap-renderer-image"
         src={getImageUrl(imageUrl)}
         alt=""
+        decoding="async"
+        loading="eager"
         onLoad={handleImageLoad}
         style={{ width: "100%", height: "auto", display: "block", borderRadius: 12 }}
       />
@@ -273,6 +275,8 @@ export function ImageMapRenderer({
                   <img
                     src={getImageUrl(ans.media[0].url)}
                     alt=""
+                    decoding="async"
+                    loading="eager"
                     style={{ width: 32, height: 32, objectFit: "contain", borderRadius: 8 }}
                   />
                   {ans.text && <span style={{ fontWeight: "bold", color: "#1e293b" }}>{ans.text}</span>}
@@ -526,6 +530,8 @@ export default function QuestionImageMap({
             className="imagemap-image"
             src={imageUrl}
             alt=""
+            decoding="async"
+            loading="eager"
             onLoad={handleImageLoad}
             draggable={false}
             style={{
@@ -660,6 +666,8 @@ export default function QuestionImageMap({
                     <img
                       src={getImageUrl(ans.media[0].url)}
                       alt={ans.text || "Ответ"}
+                      decoding="async"
+                      loading="eager"
                       style={{
                         width: "auto",
                         height: "auto",

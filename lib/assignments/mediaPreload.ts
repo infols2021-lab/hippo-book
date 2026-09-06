@@ -191,3 +191,74 @@ export function ensureMediaPreconnect() {
     document.head.appendChild(link);
   }
 }
+
+/**
+ * «Мгновенные картинки»: собирает все URL изображений из массива вопросов и
+ * ждёт их декодирования. Поля поиска:
+ * - `image` и массивы `media` в корне вопроса;
+ * - внутри каждого `options` (вариант ответа);
+ * - внутри каждой пары `pairs` (левая и правая сторона).
+ * Для каждого URL создаёт `new Image()` и возвращает промис через `img.decode()`.
+ */
+export async function preloadAssignmentImages(questions: any[]): Promise<void> {
+  const urls = new Set<string>();
+
+  for (const question of Array.isArray(questions) ? questions : []) {
+    if (!question || typeof question !== "object") continue;
+
+    // Корень вопроса
+    if (typeof question.image === "string") pushUrl(urls, question.image);
+    collectFromMedia(urls, question.media);
+
+    // options — image и media у каждого варианта
+    if (Array.isArray(question.options)) {
+      for (const opt of question.options) {
+        if (!opt || typeof opt !== "object") continue;
+        if (typeof opt.image === "string") pushUrl(urls, opt.image);
+        collectFromMedia(urls, opt.media);
+      }
+    }
+
+    // pairs — image и media слева и справа
+    if (Array.isArray(question.pairs)) {
+      for (const pair of question.pairs) {
+        if (!pair || typeof pair !== "object") continue;
+        if (typeof pair.image === "string") pushUrl(urls, pair.image);
+        collectFromMedia(urls, pair.media);
+
+        const left = pair.left;
+        if (left && typeof left === "object") {
+          if (typeof left.image === "string") pushUrl(urls, left.image);
+          collectFromMedia(urls, left.media);
+        }
+
+        const right = pair.right;
+        if (right && typeof right === "object") {
+          if (typeof right.image === "string") pushUrl(urls, right.image);
+          collectFromMedia(urls, right.media);
+        }
+      }
+    }
+  }
+
+  if (typeof window === "undefined" || typeof Image === "undefined") return;
+
+  const imageUrls = Array.from(urls).filter(isImageUrl);
+
+  await Promise.all(
+    imageUrls.map(
+      (url) =>
+        new Promise<void>((resolve) => {
+          const img = new Image();
+          img.decoding = "async";
+          img.src = url;
+          if (typeof img.decode === "function") {
+            img.decode().then(() => resolve()).catch(() => resolve());
+          } else {
+            img.onload = () => resolve();
+            img.onerror = () => resolve();
+          }
+        })
+    )
+  );
+}

@@ -27,6 +27,8 @@ function SmallMedia({ media }: { media?: any[] }) {
         <img
           src={m.url}
           alt="Медиавариант"
+          decoding="async"
+          loading="eager"
           style={{
             maxWidth: "120px",
             maxHeight: "120px",
