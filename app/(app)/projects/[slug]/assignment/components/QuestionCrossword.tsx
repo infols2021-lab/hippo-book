@@ -182,9 +182,8 @@ function inRange(r: number, c: number, rows: number, cols: number) {
 }
 
 // ============================================================================
-// Картинка кроссворда — та же надёжная схема загрузки, что и в остальных
-// заданиях (MediaRenderer/ZoomableImage): спиннер + таймаут 15с + авто-повтор
-// до 2 раз + видимая кнопка «Повторить загрузку» при ошибке.
+// Картинка кроссворда — надёжная схема загрузки: спиннер + таймаут + авто-
+// повторы (прогрев холодного CDN/прокси) + кнопка «Повторить загрузку».
 // ============================================================================
 
 function CrosswordImage({
@@ -201,7 +200,13 @@ function CrosswordImage({
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadingRef = useRef(true);
-  const AUTO_RETRY_LIMIT = 2;
+
+  // Холодный CDN/прокси: первый запрос «зависает» или рвётся, а повторный
+  // (тёплый) проходит мгновенно. Поэтому делаем несколько авто-попыток и при
+  // onError, и при таймауте — и только потом показываем кнопку «Повторить».
+  const AUTO_RETRY_LIMIT = 4;   // авто-попыток после первой (всего 5)
+  const AUTO_RETRY_DELAY_MS = 600;
+  const LOAD_TIMEOUT_MS = 8000; // «завис» без load/error дольше — перезапрашиваем
 
   const baseUrl = useMemo(() => getImageUrl(image), [image]);
   const finalUrl = useMemo(() => {
@@ -219,7 +224,41 @@ function CrosswordImage({
     };
   }, []);
 
-  // Сброс состояния + таймаут зависшей загрузки при смене URL
+  const scheduleAutoRetryOrFail = useCallback(() => {
+    if (!isMounted.current) return;
+    if (autoRetryRef.current) clearTimeout(autoRetryRef.current);
+
+    if (retryCount < AUTO_RETRY_LIMIT) {
+      // Ещё есть попытки — перезапрашиваем (тёплый кэш/CDN грузится быстро).
+      autoRetryRef.current = setTimeout(() => {
+        autoRetryRef.current = null;
+        if (isMounted.current) setRetryCount((c) => c + 1);
+      }, AUTO_RETRY_DELAY_MS);
+      return;
+    }
+
+    // Попытки закончились — показываем кнопку «Повторить загрузку».
+    if (isMounted.current) {
+      setHasError(true);
+      setIsLoading(false);
+    }
+  }, [retryCount]);
+
+  const handleLoad = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (autoRetryRef.current) clearTimeout(autoRetryRef.current);
+    loadingRef.current = false;
+    if (isMounted.current) setIsLoading(false);
+  }, []);
+
+  const handleFailure = useCallback(() => {
+    // Общий обработчик: реальная ошибка сети (onError) или наш таймаут.
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    loadingRef.current = false;
+    scheduleAutoRetryOrFail();
+  }, [scheduleAutoRetryOrFail]);
+
+  // Сброс состояния + таймаут «зависшей» загрузки при смене URL
   useEffect(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     if (autoRetryRef.current) clearTimeout(autoRetryRef.current);
@@ -230,46 +269,14 @@ function CrosswordImage({
     loadingRef.current = true;
 
     timeoutRef.current = setTimeout(() => {
-      if (loadingRef.current && isMounted.current) {
-        setHasError(true);
-        setIsLoading(false);
-      }
-    }, 15000);
+      if (loadingRef.current && isMounted.current) handleFailure();
+    }, LOAD_TIMEOUT_MS);
 
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (autoRetryRef.current) clearTimeout(autoRetryRef.current);
     };
-  }, [finalUrl]);
-
-  const handleLoad = useCallback(() => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    if (autoRetryRef.current) clearTimeout(autoRetryRef.current);
-    loadingRef.current = false;
-    if (isMounted.current) setIsLoading(false);
-  }, []);
-
-  const handleError = useCallback(() => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    loadingRef.current = false;
-    if (!isMounted.current) return;
-
-    // Первый запрос к хранилищу/прокси может оборваться, повторный (тёплый
-    // кэш) — пройти. Ошибка не показывается сразу, а делается до 2 авто-попыток.
-    if (retryCount < AUTO_RETRY_LIMIT) {
-      if (autoRetryRef.current) clearTimeout(autoRetryRef.current);
-      autoRetryRef.current = setTimeout(() => {
-        autoRetryRef.current = null;
-        if (isMounted.current) setRetryCount((c) => c + 1);
-      }, 300);
-      return;
-    }
-
-    if (isMounted.current) {
-      setHasError(true);
-      setIsLoading(false);
-    }
-  }, [retryCount]);
+  }, [finalUrl, handleFailure]);
 
   const handleRetry = useCallback(() => {
     if (isMounted.current) setRetryCount((c) => c + 1);
@@ -342,9 +349,10 @@ function CrosswordImage({
             src={finalUrl}
             alt="Изображение к кроссворду"
             onLoad={handleLoad}
-            onError={handleError}
+            onError={handleFailure}
             loading="eager"
             decoding="async"
+            fetchPriority="high"
             style={{ opacity: isLoading ? 0 : 1, transition: "opacity 0.4s ease" }}
             onClick={() => onOpenImage?.(baseUrl)}
           />

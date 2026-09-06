@@ -214,6 +214,46 @@ function collectImageUrls(urls: Set<string>, value: any) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────
+// Прогрев изображений с повторами: холодный CDN/прокси может оборвать
+// первый запрос, а повторный (тёплый) проходит. Иначе пользователь видит
+// «ошибка → повтор» у картинок даже после предзагрузки.
+// ─────────────────────────────────────────────────────────────
+
+const IMAGE_PRELOAD_RETRIES = 3; // доп. попытки после первой (всего 4)
+const IMAGE_PRELOAD_ATTEMPT_TIMEOUT_MS = 15000;
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
+/** Одна попытка загрузить и декодировать картинку. Возвращает true при успехе. */
+function preloadImageOnce(url: string, timeoutMs: number): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const done = (ok: boolean) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolve(ok);
+    };
+
+    timer = setTimeout(() => done(false), timeoutMs);
+
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => done(true);
+    img.onerror = () => done(false);
+    img.src = url;
+
+    if (typeof img.decode === "function") {
+      img.decode().then(() => done(true)).catch(() => done(false));
+    }
+  });
+}
+
 /**
  * «Мгновенные картинки»: собирает все URL изображений из массива вопросов и
  * ждёт их декодирования. Поля поиска:
@@ -262,24 +302,19 @@ export async function preloadAssignmentImages(
   onProgress?.(0, total);
 
   await Promise.all(
-    imageUrls.map(
-      (url) =>
-        new Promise<void>((resolve) => {
-          const finish = () => {
-            loaded += 1;
-            onProgress?.(loaded, total);
-            resolve();
-          };
-          const img = new Image();
-          img.decoding = "async";
-          img.src = url;
-          if (typeof img.decode === "function") {
-            img.decode().then(finish).catch(finish);
-          } else {
-            img.onload = finish;
-            img.onerror = finish;
+    imageUrls.map(async (url) => {
+      try {
+        for (let attempt = 0; attempt <= IMAGE_PRELOAD_RETRIES; attempt++) {
+          const ok = await preloadImageOnce(url, IMAGE_PRELOAD_ATTEMPT_TIMEOUT_MS);
+          if (ok) break;
+          if (attempt < IMAGE_PRELOAD_RETRIES) {
+            await sleep(500 * (attempt + 1));
           }
-        })
-    )
+        }
+      } finally {
+        loaded += 1;
+        onProgress?.(loaded, total);
+      }
+    })
   );
 }
