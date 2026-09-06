@@ -1,5 +1,5 @@
 // app/(app)/assignment/lib/image.ts
-import { getStoragePublicUrl, rewriteSupabasePublicStorageUrl } from "@/lib/storage/publicUrl";
+import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 
 // Список известных бакетов хранилища — дублирует DEFAULT_PUBLIC_BUCKETS из
 // lib/storage/server.ts. Нельзя импортировать напрямую (server-only).
@@ -22,7 +22,10 @@ const KNOWN_STORAGE_BUCKETS = [
  * Порядок проверок:
  * 1. data: — base64, возвращаем как есть.
  * 2. /api/storage/public — уже наш прокси, возвращаем как есть.
- * 3. https://... — Supabase или Yandex URL → конвертируем через rewriteSupabasePublicStorageUrl.
+ * 3. https://... — уже прямой CDN-URL (Supabase/Yandex приходят с сервера после
+ *    rewriteAssignmentMediaUrls). Возвращаем как есть, БЕЗ обратного редиректа
+ *    через /api/storage/public (иначе холодный прокси-хоп вызывает долгую загрузку
+ *    и «ошибка → повтор» у картинок).
  * 4. bucket/path/... — "голый" путь без домена, первый сегмент является известным бакетом →
  *    строим прокси-URL через getStoragePublicUrl.
  * 5. Всё остальное — возвращаем как есть (внешние URL и т.п.).
@@ -43,9 +46,9 @@ export function getImageUrl(imagePath: unknown): string {
     return raw;
   }
 
-  // 3. Абсолютный HTTP(S) URL — Supabase или Yandex → конвертируем в прокси
+  // 3. Абсолютный HTTP(S) URL — прямой CDN-URL (Supabase/Yandex). Возвращаем как есть.
   if (raw.startsWith("http://") || raw.startsWith("https://")) {
-    return rewriteSupabasePublicStorageUrl(raw);
+    return raw;
   }
 
   // 4. "Голый" путь формата "bucket/path/to/file.ext" — старые записи в БД,
