@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getImageUrl } from "@/lib/assignments/image";
 
 type Dir = "across" | "down";
@@ -181,6 +181,187 @@ function inRange(r: number, c: number, rows: number, cols: number) {
   return r >= 0 && c >= 0 && r < rows && c < cols;
 }
 
+// ============================================================================
+// Картинка кроссворда — та же надёжная схема загрузки, что и в остальных
+// заданиях (MediaRenderer/ZoomableImage): спиннер + таймаут 15с + авто-повтор
+// до 2 раз + видимая кнопка «Повторить загрузку» при ошибке.
+// ============================================================================
+
+function CrosswordImage({
+  image,
+  onOpenImage,
+}: {
+  image: unknown;
+  onOpenImage?: (src: string) => void;
+}) {
+  const isMounted = useRef(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadingRef = useRef(true);
+  const AUTO_RETRY_LIMIT = 2;
+
+  const baseUrl = useMemo(() => getImageUrl(image), [image]);
+  const finalUrl = useMemo(() => {
+    if (!baseUrl) return "";
+    if (retryCount === 0) return baseUrl;
+    return `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}retry=${retryCount}`;
+  }, [baseUrl, retryCount]);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+      if (autoRetryRef.current) clearTimeout(autoRetryRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  // Сброс состояния + таймаут зависшей загрузки при смене URL
+  useEffect(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (autoRetryRef.current) clearTimeout(autoRetryRef.current);
+    if (!isMounted.current) return;
+
+    setIsLoading(true);
+    setHasError(false);
+    loadingRef.current = true;
+
+    timeoutRef.current = setTimeout(() => {
+      if (loadingRef.current && isMounted.current) {
+        setHasError(true);
+        setIsLoading(false);
+      }
+    }, 15000);
+
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (autoRetryRef.current) clearTimeout(autoRetryRef.current);
+    };
+  }, [finalUrl]);
+
+  const handleLoad = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (autoRetryRef.current) clearTimeout(autoRetryRef.current);
+    loadingRef.current = false;
+    if (isMounted.current) setIsLoading(false);
+  }, []);
+
+  const handleError = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    loadingRef.current = false;
+    if (!isMounted.current) return;
+
+    // Первый запрос к хранилищу/прокси может оборваться, повторный (тёплый
+    // кэш) — пройти. Ошибка не показывается сразу, а делается до 2 авто-попыток.
+    if (retryCount < AUTO_RETRY_LIMIT) {
+      if (autoRetryRef.current) clearTimeout(autoRetryRef.current);
+      autoRetryRef.current = setTimeout(() => {
+        autoRetryRef.current = null;
+        if (isMounted.current) setRetryCount((c) => c + 1);
+      }, 300);
+      return;
+    }
+
+    if (isMounted.current) {
+      setHasError(true);
+      setIsLoading(false);
+    }
+  }, [retryCount]);
+
+  const handleRetry = useCallback(() => {
+    if (isMounted.current) setRetryCount((c) => c + 1);
+  }, []);
+
+  if (!baseUrl) return null;
+
+  return (
+    <div className="cw-card cw-image-card" style={{ position: "relative" }}>
+      {hasError ? (
+        <div style={{ textAlign: "center", padding: "40px 20px", color: "#94a3b8" }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div>
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>
+            Не удалось загрузить фото
+          </div>
+          <button
+            type="button"
+            onClick={handleRetry}
+            style={{
+              padding: "8px 16px",
+              background: "#007bff",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: 13,
+            }}
+          >
+            Повторить загрузку
+          </button>
+        </div>
+      ) : (
+        <div
+          style={{
+            position: "relative",
+            width: "min(560px, 100%)",
+            minHeight: 200,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {isLoading && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 5,
+                pointerEvents: "none",
+              }}
+            >
+              <div
+                style={{
+                  width: 34,
+                  height: 34,
+                  border: "3px solid rgba(0, 123, 255, 0.12)",
+                  borderTopColor: "#007bff",
+                  borderRadius: "50%",
+                  animation: "cwSpin 0.8s linear infinite",
+                }}
+              />
+            </div>
+          )}
+          <img
+            className="cw-image"
+            src={finalUrl}
+            alt="Изображение к кроссворду"
+            onLoad={handleLoad}
+            onError={handleError}
+            loading="eager"
+            decoding="async"
+            style={{ opacity: isLoading ? 0 : 1, transition: "opacity 0.4s ease" }}
+            onClick={() => onOpenImage?.(baseUrl)}
+          />
+        </div>
+      )}
+      <div className="cw-image-hint">Нажмите на изображение для увеличения</div>
+      <style jsx global>{`
+        @keyframes cwSpin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 export default function QuestionCrossword({
   question,
   value,
@@ -225,22 +406,6 @@ export default function QuestionCrossword({
   const [focused, setFocused] = useState<{ r: number; c: number } | null>(null);
   const [dir, setDir] = useState<Dir>("across");
   const lastClickRef = useRef<{ r: number; c: number; t: number } | null>(null);
-
-  // Автоповтор картинки кроссворда (первый запрос к хранилищу может оборваться)
-  const [cwImgRetry, setCwImgRetry] = useState(0);
-
-  const cwImageUrl = useMemo(() => {
-    const base = getImageUrl(question?.image);
-    if (!base) return "";
-    return cwImgRetry > 0
-      ? `${base}${base.includes("?") ? "&" : "?"}retry=${cwImgRetry}`
-      : base;
-  }, [question?.image, cwImgRetry]);
-
-  // Сброс повторов при смене изображения (переход к другому вопросу)
-  useEffect(() => {
-    setCwImgRetry(0);
-  }, [question?.image]);
 
   function isHardBlocked(r: number, c: number) {
     return blocks.some((b) => b.row === r && b.col === c);
@@ -369,25 +534,7 @@ export default function QuestionCrossword({
   return (
     <div className="crossword-container">
       {question?.image && !(question?.media?.length) ? (
-        <div className="cw-card cw-image-card">
-          <img
-            key={cwImgRetry}
-            className="cw-image"
-            src={cwImageUrl}
-            alt="Изображение к кроссворду"
-            decoding="async"
-            loading="eager"
-            onClick={() => onOpenImage?.(getImageUrl(question.image))}
-            onError={(e) => {
-              if (cwImgRetry < 2) {
-                window.setTimeout(() => setCwImgRetry((c) => c + 1), 250);
-              } else {
-                e.currentTarget.style.display = "none";
-              }
-            }}
-          />
-          <div className="cw-image-hint">Нажмите на изображение для увеличения</div>
-        </div>
+        <CrosswordImage image={question?.image} onOpenImage={onOpenImage} />
       ) : null}
 
       <div className="cw-card">
