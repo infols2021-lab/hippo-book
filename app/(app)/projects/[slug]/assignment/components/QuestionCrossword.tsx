@@ -204,16 +204,14 @@ function CrosswordImage({
   // Холодный CDN/прокси: первый запрос «зависает» или рвётся, а повторный
   // (тёплый) проходит мгновенно. Поэтому делаем несколько авто-попыток и при
   // onError, и при таймауте — и только потом показываем кнопку «Повторить».
-  const AUTO_RETRY_LIMIT = 4;   // авто-попыток после первой (всего 5)
-  const AUTO_RETRY_DELAY_MS = 600;
-  const LOAD_TIMEOUT_MS = 8000; // «завис» без load/error дольше — перезапрашиваем
+  const AUTO_RETRY_LIMIT = 4;    // авто-попыток после первой (всего 5)
+  const AUTO_RETRY_DELAY_MS = 1500; // задержка авто-повтора — в секундах (не доли секунды)
+  const LOAD_TIMEOUT_MS = 15000; // «завис» без load/error дольше — перезапрашиваем (как в обычных вопросах)
 
   const baseUrl = useMemo(() => getImageUrl(image), [image]);
-  const finalUrl = useMemo(() => {
-    if (!baseUrl) return "";
-    if (retryCount === 0) return baseUrl;
-    return `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}retry=${retryCount}`;
-  }, [baseUrl, retryCount]);
+  // Намеренно БЕЗ cache-busting (?retry=N): повторная попытка делает ремоунт <img>
+  // через key={retryCount}, но src остаётся тем же — браузер не теряет уже
+  // закешированный файл (например, докачавшийся в фоне после первого показа).
 
   useEffect(() => {
     isMounted.current = true;
@@ -276,7 +274,7 @@ function CrosswordImage({
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (autoRetryRef.current) clearTimeout(autoRetryRef.current);
     };
-  }, [finalUrl, handleFailure]);
+  }, [baseUrl, retryCount, handleFailure]);
 
   const handleRetry = useCallback(() => {
     if (isMounted.current) setRetryCount((c) => c + 1);
@@ -345,8 +343,9 @@ function CrosswordImage({
             </div>
           )}
           <img
+            key={retryCount}
             className="cw-image"
-            src={finalUrl}
+            src={baseUrl}
             alt="Изображение к кроссворду"
             onLoad={handleLoad}
             onError={handleFailure}
