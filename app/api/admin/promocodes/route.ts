@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { fail } from "@/lib/api/response";
 
 async function verifyAdmin() {
   const userClient = await createSupabaseServerClient();
@@ -60,7 +61,7 @@ export async function GET() {
       ]);
 
     if (promoErr) {
-      return NextResponse.json({ error: promoErr.message }, { status: 400 });
+      return fail(promoErr.message, 400, "DB_ERROR");
     }
 
     const materialsMap = new Map((allMaterials || []).map((m: any) => [m.id, m.title]));
@@ -194,7 +195,7 @@ export async function POST(request: Request) {
           { status: 400 }
         );
       }
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return fail(error.message, 400, "DB_ERROR");
     }
 
     return NextResponse.json({ success: true, promocode: data });
@@ -225,7 +226,7 @@ export async function DELETE(request: Request) {
         .neq("id", "00000000-0000-0000-0000-000000000000");
 
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 400 });
+        return fail(error.message, 400, "DB_ERROR");
       }
       return NextResponse.json({ success: true });
     }
@@ -236,7 +237,7 @@ export async function DELETE(request: Request) {
 
     const { error } = await adminSupabase.from("promocodes").delete().eq("id", id);
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return fail(error.message, 400, "DB_ERROR");
     }
 
     return NextResponse.json({ success: true });

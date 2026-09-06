@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { ok, fail } from "@/lib/api/response";
 import { verifyTurnstileToken } from "@/lib/security/turnstile";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -51,14 +50,12 @@ export async function POST(req: Request) {
 
     const { error } = await supabase.auth.updateUser({ password });
     if (error) {
-      return fail("Не удалось обновить пароль: " + error.message, 400, "UPDATE_FAILED");
+      console.error("[update_password_failed]", error.message);
+      return fail("Не удалось обновить пароль. Попробуйте позже.", 400, "UPDATE_FAILED");
     }
 
     return ok({ message: "✅ Пароль успешно изменён! Теперь войдите в систему." });
   } catch (e: any) {
-    return NextResponse.json(
-      { ok: false, error: e?.message || String(e), code: "SERVER_ERROR" },
-      { status: 500 }
-    );
+    return fail(e?.message || String(e), 500, "SERVER_ERROR");
   }
 }

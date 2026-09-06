@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { fail } from "@/lib/api/response";
 
 async function verifyAdmin() {
   const userClient = await createSupabaseServerClient();
@@ -43,7 +44,7 @@ export async function GET() {
       .order("day_number", { ascending: true });
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return fail(error.message, 400, "DB_ERROR");
     }
 
     return NextResponse.json({ streakConfig: data || [] });
@@ -105,7 +106,7 @@ export async function POST(request: Request) {
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return fail(error.message, 400, "DB_ERROR");
     }
 
     // 3. Если привязка изменилась, изымаем старую награду из стриков
@@ -160,7 +161,7 @@ export async function DELETE(request: Request) {
       .eq("day_number", dayNumber);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return fail(error.message, 400, "DB_ERROR");
     }
 
     // 3. Автоматически чистим инвентарь от удалённой награды стрика

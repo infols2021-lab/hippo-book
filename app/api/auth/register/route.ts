@@ -136,7 +136,8 @@ export async function POST(req: Request) {
         return fail("Слишком много попыток. Попробуйте позже.", 429, "RATE_LIMIT");
       }
 
-      return fail("Ошибка регистрации: " + error.message, 400, "SIGNUP_FAILED");
+      console.error("[signup_failed]", error);
+      return fail("Не удалось зарегистрироваться. Попробуйте позже.", 400, "SIGNUP_FAILED");
     }
 
     const userId = data.user?.id;

@@ -106,7 +106,7 @@ export async function GET(
 
     if (aErr || !rawAssignment) {
       console.error("🔴 [API ASSIGNMENT-DATA] Ошибка поиска задания:", aErr?.message);
-      return fail(aErr?.message || "Assignment not found", 404, "NOT_FOUND");
+      return fail("Задание не найдено", 404, "NOT_FOUND");
     }
 
     const assignment = rawAssignment as any;

@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { fail } from "@/lib/api/response";
 import type { RewardType } from "@/lib/rewards/types";
 
 const VALID_TYPES: RewardType[] = ["hat", "aura", "emotion", "base", "title"];
@@ -46,7 +47,7 @@ export async function GET() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return fail(error.message, 400, "DB_ERROR");
     }
 
     return NextResponse.json({ rewards: data || [] });
@@ -106,7 +107,7 @@ export async function POST(request: Request) {
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return fail(error.message, 400, "DB_ERROR");
     }
 
     return NextResponse.json({ success: true, reward: data });
@@ -135,7 +136,7 @@ export async function DELETE(request: Request) {
 
     const { error } = await adminSupabase.from("rewards").delete().eq("id", id);
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return fail(error.message, 400, "DB_ERROR");
     }
 
     return NextResponse.json({ success: true });

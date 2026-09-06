@@ -128,7 +128,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       .eq("id", materialId)
       .single();
 
-    if (error) return fail(error.message, 404, "NOT_FOUND");
+    if (error) return fail("Материал не найден", 404, "NOT_FOUND");
 
     const { count } = await supabase
       .from("assignments")

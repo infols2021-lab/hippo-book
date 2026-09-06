@@ -106,7 +106,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
 
     if (error) {
       console.error("🔴 [ADMIN GET MATERIAL] Ошибка поиска:", error.message);
-      return fail(error.message, 404, "NOT_FOUND");
+      return fail("Материал не найден", 404, "NOT_FOUND");
     }
 
     const { count, error: countErr } = await supabase

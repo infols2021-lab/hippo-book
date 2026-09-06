@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/api/admin";
+import { fail } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +32,7 @@ export async function GET() {
     });
   } catch (error: any) {
     console.error("GET Referral Config Error:", error);
-    return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 });
+    return fail(error?.message || "Internal Server Error", 500, "SERVER_ERROR");
   }
 }
 
@@ -127,6 +128,6 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error("POST Referral Config Error:", error);
-    return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 });
+    return fail(error?.message || "Internal Server Error", 500, "SERVER_ERROR");
   }
 }
