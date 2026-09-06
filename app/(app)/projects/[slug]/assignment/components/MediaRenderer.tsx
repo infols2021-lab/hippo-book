@@ -358,6 +358,7 @@ function ZoomableImage({
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const loadingRef = useRef(true); // синхронный флаг для таймаута
   const autoRetryRef = useRef<NodeJS.Timeout | null>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
   const AUTO_RETRY_LIMIT = 2; // авто-повторов после первой ошибки загрузки
 
   const finalUrl = useMemo(() => {
@@ -436,6 +437,19 @@ function ZoomableImage({
       setIsLoading(false);
     }
   }, [retryCount]);
+
+  // Исправление race condition: картинка из дискового кеша может сработать
+  // onLoad/onError до того, как React повесит слушатели. Проверяем complete.
+  useEffect(() => {
+    const img = imgRef.current;
+    if (img && img.complete) {
+      if (img.naturalWidth > 0) {
+        handleLoad();
+      } else {
+        handleError();
+      }
+    }
+  }, [finalUrl, handleLoad, handleError]);
 
   const handleRetry = useCallback(() => {
     if (isMounted.current) {
@@ -522,6 +536,7 @@ function ZoomableImage({
         </div>
       ) : (
         <img
+          ref={imgRef}
           src={finalUrl}
           alt={name || "Task Image"}
           onLoad={handleLoad}

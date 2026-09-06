@@ -12,7 +12,7 @@
 
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import { rewriteSupabasePublicStorageUrl } from "@/lib/storage/publicUrl";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,6 +42,7 @@ export function SafeImg({
 }: SafeImgProps) {
   const [retryCount, setRetryCount] = useState(0);
   const [hasError, setHasError] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
 
   // Конвертируем URL в прокси-формат
   // rewriteSupabasePublicStorageUrl:
@@ -70,11 +71,20 @@ export function SafeImg({
     }
   }, [fallbackSrc, hasError]);
 
-  // Нет URL — ничего не рендерим
-  if (!proxiedSrc && !hasError) return null;
-
   // Ошибка + есть fallback — показываем fallback
   const displaySrc = hasError && fallbackSrc ? fallbackSrc : proxiedSrc;
+
+  // Исправление race condition: закэшированная ошибка могла сработать
+  // onError до подписки React. Проверяем complete при монтировании/смене src.
+  useEffect(() => {
+    const img = imgRef.current;
+    if (img && img.complete && img.naturalWidth <= 0) {
+      handleError();
+    }
+  }, [displaySrc, handleError]);
+
+  // Нет URL — ничего не рендерим
+  if (!proxiedSrc && !hasError) return null;
 
   if (!displaySrc) {
     // Нет ни URL ни fallback — показываем заглушку или ничего
@@ -102,6 +112,7 @@ export function SafeImg({
   // eslint-disable-next-line @next/next/no-img-element
   return (
     <img
+      ref={imgRef}
       src={displaySrc}
       alt={alt}
       onError={handleError}
