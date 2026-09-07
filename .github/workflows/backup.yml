@@ -26,11 +26,11 @@ jobs:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           TIMESTAMP=$(date +'%Y-%m-%d_%H-%M')
-          pg_dump "$DB_URL" | gzip > "backup_${TIMESTAMP}.sql.gz"
+          pg_dump "$DB_URL" --clean --if-exists --no-owner --no-privileges -f "backup_${TIMESTAMP}.sql"
 
       - name: Save Backup to GitHub Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: database-backup
-          path: "*.sql.gz"
+          path: "*.sql"
           retention-days: 90
