@@ -116,6 +116,20 @@ function applyCursor(q: any, cursorCreatedAt: string) {
   return q.lt("created_at", d.toISOString());
 }
 
+// Безопасно достаёт вложенный таб материала (project_tabs) — объект или массив.
+function readMaterialTab(m: unknown): { title?: unknown; project_id?: unknown } | null {
+  const projectTabs = (
+    m as {
+      project_tabs?:
+        | { title?: unknown; project_id?: unknown }
+        | { title?: unknown; project_id?: unknown }[]
+        | null;
+    }
+  ).project_tabs;
+  const arr = Array.isArray(projectTabs) ? projectTabs : projectTabs ? [projectTabs] : [];
+  return arr[0] ?? null;
+}
+
 async function fetchMaterialsByIds(supabase: any, materialIds: string[]) {
   if (!materialIds || materialIds.length === 0) return new Map();
 
@@ -126,7 +140,7 @@ async function fetchMaterialsByIds(supabase: any, materialIds: string[]) {
   ] = await Promise.all([
     supabase
       .from("materials")
-      .select("id, title, price, material_kind, project_tabs(title)")
+      .select("id, title, price, material_kind, project_tabs(title, project_id)")
       .in("id", materialIds),
     supabase
       .from("textbooks")
@@ -138,17 +152,55 @@ async function fetchMaterialsByIds(supabase: any, materialIds: string[]) {
       .in("id", materialIds),
   ]);
 
-  const map = new Map<string, { id: string; title: string; price: number; material_kind?: string; tab_title?: string }>();
+  const map = new Map<
+    string,
+    {
+      id: string;
+      title: string;
+      price: number;
+      material_kind?: string;
+      tab_title?: string;
+      project_id?: string;
+      project_name?: string;
+    }
+  >();
+
+  // Собираем названия проектов, в которых лежат материалы (их может быть несколько).
+  const materialProjectIds = new Set<string>();
+  if (Array.isArray(fetchedMaterials)) {
+    for (const m of fetchedMaterials) {
+      const tab = readMaterialTab(m);
+      if (tab?.project_id) materialProjectIds.add(String(tab.project_id));
+    }
+  }
+
+  let projectNameRows: { id: string; name: string }[] = [];
+  if (materialProjectIds.size > 0) {
+    const { data } = await supabase
+      .from("projects")
+      .select("id, name")
+      .in("id", Array.from(materialProjectIds));
+    projectNameRows = (data || []) as { id: string; name: string }[];
+  }
+  const projectNameById = new Map<string, string>();
+  for (const p of projectNameRows) projectNameById.set(String(p.id), String(p.name));
 
   if (Array.isArray(fetchedMaterials)) {
     for (const m of fetchedMaterials) {
-      const rawTabTitle = (m as any).project_tabs?.title || null;
+      const tab = readMaterialTab(m);
+      const rawTabTitle = tab?.title ? String(tab.title) : null;
+      const projectId = tab?.project_id ? String(tab.project_id) : undefined;
       map.set(String(m.id), {
         id: String(m.id),
         title: String(m.title || "Материал"),
         price: Number(m.price || 1000),
         material_kind: m.material_kind ? String(m.material_kind) : undefined,
         tab_title: rawTabTitle ? String(rawTabTitle) : undefined,
+        project_id: projectId,
+        project_name:
+          projectId && projectNameById.has(projectId)
+            ? projectNameById.get(projectId)
+            : undefined,
       });
     }
   }

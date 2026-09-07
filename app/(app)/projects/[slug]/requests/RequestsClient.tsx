@@ -32,6 +32,8 @@ type MaterialItem = {
   material_kind: string;
   target_levels?: string[] | null;
   tabTitle?: string | null;
+  projectId?: string | null;
+  projectName?: string | null;
 };
 
 type PurchaseRequest = {
@@ -65,6 +67,8 @@ type RequestMaterialMeta = {
   price: number;
   material_kind?: string;
   tab_title?: string | null;
+  project_id?: string | null;
+  project_name?: string | null;
 };
 
 type GrantedItem = {
@@ -167,12 +171,16 @@ function normalizeRequestRow(row: any): PurchaseRequest {
   };
 }
 
-// Единый премиальный бейдж названия таба (Use of English, Speaking и т.д.)
-const TAB_BADGE_CLASS =
-  "ml-2 inline-block px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest rounded-md border border-slate-200/60 align-middle";
+// Единый премиальный «мета-тег»: название таба или проекта материала.
+const META_BADGE_CLASS =
+  "inline-block px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest rounded-md border border-slate-200/60 align-middle";
 
 function TabBadge({ label }: { label: string }) {
-  return <span className={TAB_BADGE_CLASS}>{label}</span>;
+  return <span className={`${META_BADGE_CLASS} ml-2`}>{label}</span>;
+}
+
+function ProjectBadge({ label }: { label: string }) {
+  return <span className={META_BADGE_CLASS}>{label}</span>;
 }
 
 // Человекочитаемая подпись типа материала для устаревших заявок без material_ids.
@@ -341,6 +349,8 @@ export default function RequestsClient({
         project_tab_id: null,
         material_kind: m.material_kind || "material",
         tabTitle: m.tab_title ?? null,
+        projectId: m.project_id ?? null,
+        projectName: m.project_name ?? null,
       };
     }
     return map;
@@ -400,10 +410,16 @@ export default function RequestsClient({
     // Обновляем витрину текущего проекта и одновременно пополняем общий справочник
     // materialMetaById, чтобы корзина и история видели материалы со всех проектов.
     function applyLoadedMaterials(list: MaterialItem[]) {
-      setMaterials(list);
+      // Материалы каталога всегда принадлежат текущему выбранному проекту.
+      const withProject = list.map((m) => ({
+        ...m,
+        projectId: catalogProject.id,
+        projectName: catalogProject.name,
+      }));
+      setMaterials(withProject);
       setMaterialMetaById((prev) => {
         const next = { ...prev };
-        for (const m of list) {
+        for (const m of withProject) {
           next[m.id] = m;
         }
         return next;
@@ -489,7 +505,7 @@ export default function RequestsClient({
     return () => {
       alive = false;
     };
-  }, [catalogProject.slug, tabs]);
+  }, [catalogProject.slug, catalogProject.id, catalogProject.name, tabs]);
 
   useEffect(() => {
     setRequests(initialRequests.map(normalizeRequestRow));
@@ -510,6 +526,8 @@ export default function RequestsClient({
           project_tab_id: next[m.id]?.project_tab_id ?? null,
           material_kind: m.material_kind || "material",
           tabTitle: m.tab_title ?? null,
+          projectId: m.project_id ?? null,
+          projectName: m.project_name ?? null,
         };
       }
       return next;
@@ -982,6 +1000,36 @@ export default function RequestsClient({
     );
   }
 
+  // Проекты, к которым относятся материалы заявки (их может быть несколько).
+  function getRequestProjectNames(r: PurchaseRequest): string[] {
+    const names = new Set<string>();
+    for (const id of toStringArray(r.material_ids)) {
+      const name = materialMetaById[id]?.projectName;
+      if (name) names.add(name);
+    }
+    return Array.from(names);
+  }
+
+  function renderRequestProjects(r: PurchaseRequest) {
+    const names = getRequestProjectNames(r);
+
+    if (names.length > 0) {
+      return (
+        <div className="flex flex-wrap gap-1">
+          {names.map((name) => (
+            <ProjectBadge key={name} label={name} />
+          ))}
+        </div>
+      );
+    }
+
+    const fallbackName = r.project_id ? projectNameById.get(r.project_id) : undefined;
+    if (fallbackName) {
+      return <ProjectBadge label={fallbackName} />;
+    }
+    return <span style={{ opacity: 0.7 }}>—</span>;
+  }
+
   return (
     <div className="page-requests">
       <style>{`
@@ -1248,6 +1296,11 @@ export default function RequestsClient({
 
                         <div className="requests-material-card-body">
                           <div className="requests-material-card-title">{item.title}</div>
+                          {item.tabTitle ? (
+                            <div style={{ marginBottom: 8 }}>
+                              <TabBadge label={item.tabTitle} />
+                            </div>
+                          ) : null}
                           <div className="requests-material-card-footer">
                             <span className="requests-material-card-price">{formatPrice(item.price)}</span>
                             {isOwned ? (
@@ -1645,9 +1698,7 @@ export default function RequestsClient({
                         <tr key={r.id}>
                           <td style={{ fontWeight: 800 }}>{r.request_number}</td>
                           {showProjectSwitcher && (
-                            <td style={{ fontWeight: 700, opacity: 0.85 }}>
-                              {r.project_id ? projectNameById.get(r.project_id) || "—" : "—"}
-                            </td>
+                            <td>{renderRequestProjects(r)}</td>
                           )}
                           <td style={{ opacity: 0.8 }}>{formatDateTime(r.created_at)}</td>
                           <td>{renderRequestMaterialsRow(r)}</td>
@@ -1706,9 +1757,7 @@ export default function RequestsClient({
                       </div>
 
                       {showProjectSwitcher && (
-                        <div className="request-card-project">
-                          {r.project_id ? projectNameById.get(r.project_id) || "—" : "—"}
-                        </div>
+                        <div className="request-card-project">{renderRequestProjects(r)}</div>
                       )}
 
                       <div className="request-card-body">

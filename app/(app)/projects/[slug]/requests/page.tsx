@@ -12,6 +12,8 @@ type RequestMaterialMeta = {
   price: number;
   material_kind?: string;
   tab_title?: string | null;
+  project_id?: string | null;
+  project_name?: string | null;
 };
 
 export default async function ProjectRequestsPage({
@@ -163,7 +165,7 @@ export default async function ProjectRequestsPage({
     ] = await Promise.all([
       supabase
         .from("materials")
-        .select("id, title, price, material_kind, project_tabs(title)")
+        .select("id, title, price, material_kind, project_tabs(title, project_id)")
         .in("id", allRequestMaterialIds),
       supabase
         .from("textbooks")
@@ -175,20 +177,51 @@ export default async function ProjectRequestsPage({
         .in("id", allRequestMaterialIds),
     ]);
 
+    type MaterialTabEmbed = {
+      title?: unknown;
+      project_id?: unknown;
+    } | null;
+
+    function readMaterialTab(m: unknown): { tab: MaterialTabEmbed } {
+      const projectTabs = (m as { project_tabs?: MaterialTabEmbed | MaterialTabEmbed[] })
+        .project_tabs;
+      const arr = Array.isArray(projectTabs) ? projectTabs : projectTabs ? [projectTabs] : [];
+      return { tab: arr[0] ?? null };
+    }
+
     const map = new Map<string, RequestMaterialMeta>();
 
+    // Имена проектов, в которых лежат материалы заявок (их может быть несколько).
+    const tabProjectIds = new Set<string>();
     for (const m of fetchedRequestMats || []) {
-      const projectTabs = (m as { project_tabs?: { title?: unknown } | { title?: unknown }[] | null })
-        .project_tabs;
-      const rawTabTitle = Array.isArray(projectTabs)
-        ? String(projectTabs[0]?.title ?? "")
-        : String(projectTabs?.title ?? "");
+      const { tab } = readMaterialTab(m);
+      const pid = tab?.project_id;
+      if (pid) tabProjectIds.add(String(pid));
+    }
+
+    let projectNameRows: { id: string; name: string }[] | null = null;
+    if (tabProjectIds.size > 0) {
+      const res = await supabase
+        .from("projects")
+        .select("id, name")
+        .in("id", Array.from(tabProjectIds));
+      projectNameRows = (res.data || []) as { id: string; name: string }[];
+    }
+    const projectNameById = new Map<string, string>();
+    for (const p of projectNameRows || []) projectNameById.set(String(p.id), String(p.name));
+
+    for (const m of fetchedRequestMats || []) {
+      const { tab } = readMaterialTab(m);
+      const rawTabTitle = tab?.title ? String(tab.title) : "";
+      const projectId = tab?.project_id ? String(tab.project_id) : null;
       map.set(String(m.id), {
         id: String(m.id),
         title: String(m.title || "Материал"),
         price: Number(m.price || 0),
         material_kind: m.material_kind ? String(m.material_kind) : "material",
         tab_title: rawTabTitle || null,
+        project_id: projectId,
+        project_name: projectId ? (projectNameById.get(projectId) ?? null) : null,
       });
     }
 

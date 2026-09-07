@@ -34,6 +34,8 @@ type MaterialItemMeta = {
   price?: number;
   material_kind?: string;
   tab_title?: string;
+  project_id?: string;
+  project_name?: string;
 };
 
 type Stats = { total: number; pending: number; processed: number };
@@ -88,15 +90,42 @@ function isValidUUID(str: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
 }
 
-// Премиальная плашка с названием таба материала (Use of English, Speaking и т.п.)
-const TAB_BADGE_CLASS =
-  "ml-2 inline-block px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest rounded-md border border-slate-200/60 align-middle";
+// Премиальная плашка-«мета-тег»: название таба или проекта материала.
+const META_BADGE_CLASS =
+  "inline-block px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest rounded-md border border-slate-200/60 align-middle";
 
 function TabBadge({ label }: { label: string }) {
-  return <span className={TAB_BADGE_CLASS}>{label}</span>;
+  return <span className={`${META_BADGE_CLASS} ml-2`}>{label}</span>;
 }
 
-function renderProjectName(row: RequestRow) {
+function ProjectBadge({ label }: { label: string }) {
+  return <span className={META_BADGE_CLASS}>{label}</span>;
+}
+
+function renderProjectName(row: RequestRow, items?: (MaterialItemMeta | string)[]) {
+  // Заявка может содержать материалы из нескольких проектов — показываем все.
+  const projectNames = Array.from(
+    new Set(
+      (items || [])
+        .map((it) =>
+          typeof it === "object" && it.project_name
+            ? String(it.project_name).trim()
+            : ""
+        )
+        .filter(Boolean)
+    )
+  );
+
+  if (projectNames.length > 0) {
+    return (
+      <div className="flex flex-wrap gap-1">
+        {projectNames.map((name) => (
+          <ProjectBadge key={name} label={name} />
+        ))}
+      </div>
+    );
+  }
+
   if (row.projects?.name) {
     return (
       <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-lg text-sm font-bold shadow-sm whitespace-nowrap">
@@ -809,7 +838,7 @@ export default function RequestsTab({
                       <td className="p-4 font-bold font-mono text-xs">
                         {r.request_number || "—"}
                       </td>
-                      <td className="p-4">{renderProjectName(r)}</td>
+                      <td className="p-4">{renderProjectName(r, materialsByRequest?.[r.id])}</td>
                       <td className="p-4 text-xs font-mono text-gray-500 whitespace-nowrap">
                         {fmtDate(r.created_at)}
                       </td>
