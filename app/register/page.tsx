@@ -114,9 +114,8 @@ export default function RegisterPage() {
 
     try {
       setBusy(true);
-      showBanner("warning", "🔄 Создаем ваш аккаунт...");
+      showBanner("warning", "Создаем ваш аккаунт...");
 
-      // Извлекаем ID пригласившего из URL (реферальная система)
       let refId: string | undefined = undefined;
       if (typeof window !== "undefined") {
         const urlParams = new URLSearchParams(window.location.search);
@@ -133,7 +132,7 @@ export default function RegisterPage() {
           email: email.trim().toLowerCase(),
           password,
           captchaToken,
-          ref: refId, // Передаем реферальный код на бэкенд
+          ref: refId,
         }),
       });
 
@@ -154,8 +153,8 @@ export default function RegisterPage() {
       clearBanner();
       openModal(
         "success",
-        "Успешно!",
-        json.message || "✅ Регистрация принята!\n\n📧 Проверьте почту (и папку Спам) и подтвердите email.\nБез подтверждения вход невозможен."
+        "Успешно",
+        json.message || "Регистрация принята.\n\nПроверьте почту и подтвердите email для завершения настройки."
       );
       setRegistered(true);
 
@@ -166,11 +165,10 @@ export default function RegisterPage() {
       setBusy(false);
       clearBanner();
       resetCaptchaHard();
-      openModal("error", "Ошибка", "Не удалось отправить запрос. Проверьте интернет или VPN.");
+      openModal("error", "Ошибка", "Не удалось отправить запрос. Проверьте интернет или отключите VPN.");
     }
   }
 
-  // Обработка Enter
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Enter") {
@@ -193,12 +191,11 @@ export default function RegisterPage() {
           <div className="modal-notice">
             <div className="modal-notice-head">
               <div style={{ fontWeight: 800, fontSize: 18, color: "#1e293b" }}>
-                {modalKind === "success" ? "🎉 " : modalKind === "error" ? "❌ " : "⚠️ "}
                 {modalTitle}
               </div>
               <button type="button" onClick={closeModal} className="modal-notice-x">✕</button>
             </div>
-            <div className="modal-notice-body">{modalBody}</div>
+            <div className="modal-notice-body" style={{ whiteSpace: "pre-wrap" }}>{modalBody}</div>
             <div className="modal-notice-actions">
               {modalKind === "error" || modalKind === "warning" ? (
                 <button type="button" className="btn btn-secondary" onClick={() => { resetCaptchaHard(); closeModal(); }}>
@@ -206,7 +203,7 @@ export default function RegisterPage() {
                 </button>
               ) : null}
               <button type="button" className="btn btn-primary" onClick={closeModal} style={{ width: "auto", marginTop: 0 }}>
-                Ок
+                Понятно
               </button>
             </div>
           </div>
@@ -224,7 +221,6 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* ИНДИКАТОР ПРОГРЕССА */}
           <div className="progress-bar">
             <div className={`progress-step ${step >= 1 ? "active" : ""}`} />
             <div className={`progress-step ${step >= 2 ? "active" : ""}`} />
@@ -233,19 +229,50 @@ export default function RegisterPage() {
 
           {showTopBanner ? <div className={`banner ${bannerType}`}>{bannerText}</div> : null}
 
-          {!siteKey ? <div className="banner error-message">❌ Ключ капчи не настроен</div> : null}
+          {!siteKey ? <div className="banner error-message">Ключ защиты не настроен</div> : null}
 
           {registered ? (
-            <div className="success-screen animate-step">
-              <div className="success-icon"></div>
-              <h3>Аккаунт создан!</h3>
-              <p>Остался один шаг: проверьте вашу почту. обязательно процерьте папку "Спам" <strong>{email}</strong> и перейдите по ссылке для активации.</p>
-              <div className="link"><a href="/login">Перейти ко входу</a></div>
+            <div className="success-screen animate-step flex flex-col items-center">
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-6 shadow-sm">
+                <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              
+              <h3 className="text-2xl font-bold text-slate-900 mb-2 tracking-tight">Аккаунт создан</h3>
+              <p className="text-[15px] text-slate-500 mb-6 text-center leading-relaxed">
+                Мы отправили ссылку для активации на <strong className="text-slate-800 font-semibold">{email}</strong>. Перейдите по ней, чтобы завершить регистрацию.
+              </p>
+              
+              <div className="link mb-4"><a href="/login" className="font-semibold text-sky-600 hover:text-sky-700">Перейти ко входу</a></div>
+
+              <div className="mt-6 p-6 bg-slate-50/50 backdrop-blur-md border border-slate-200/60 rounded-[24px] text-center w-full shadow-sm">
+                <h4 className="text-[15px] font-semibold text-slate-800 mb-3 tracking-tight">
+                  Не можете найти письмо?
+                </h4>
+                
+                <p className="text-[14px] text-slate-500 leading-relaxed mb-5 font-medium">
+                  Иногда автоматические сообщения попадают в папку «Спам». Если письмо оказалось там, пожалуйста, отметьте его как «Не спам» — это очень поможет нашему проекту.
+                </p>
+                
+                <div className="w-10 h-[2px] bg-slate-200 mx-auto mb-5 rounded-full" />
+                
+                <p className="text-[14px] text-slate-500 font-medium">
+                  Письмо так и не пришло?{" "}
+                  <a 
+                    href="https://t.me/skebobingg" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-sky-500 hover:text-sky-600 font-semibold transition-colors decoration-sky-500/30 hover:underline underline-offset-4"
+                  >
+                    Написать в поддержку
+                  </a>
+                </p>
+              </div>
             </div>
           ) : (
             <div className="wizard-content">
               
-              {/* === ШАГ 1: Базовые данные === */}
               {step === 1 && (
                 <div className="animate-step">
                   <h2 className="step-title">Шаг 1. Расскажите о себе</h2>
@@ -280,7 +307,6 @@ export default function RegisterPage() {
                 </div>
               )}
 
-              {/* === ШАГ 2: Контакты === */}
               {step === 2 && (
                 <div className="animate-step">
                   <h2 className="step-title">Шаг 2. Как с вами связаться?</h2>
@@ -315,7 +341,6 @@ export default function RegisterPage() {
                 </div>
               )}
 
-              {/* === ШАГ 3: Безопасность === */}
               {step === 3 && (
                 <div className="animate-step">
                   <h2 className="step-title">Шаг 3. Защита аккаунта</h2>

@@ -144,13 +144,6 @@ export default function ResetPage() {
       clearBanner();
       setSent(true);
 
-      openModal(
-        "success",
-        "Письмо отправлено",
-        json.message ||
-          "Если указанный email зарегистрирован в системе, мы отправили на него ссылку для смены пароля.\n\nПожалуйста, проверьте папку «Входящие» и «Спам»."
-      );
-
       setCaptchaToken(null);
     } catch (e: any) {
       setBusy(false);
@@ -175,12 +168,11 @@ export default function ResetPage() {
           <div className="modal-notice">
             <div className="modal-notice-head">
               <div style={{ fontWeight: 800, fontSize: 18, color: "#1e293b" }}>
-                {modalKind === "success" ? "🎉 " : modalKind === "error" ? "❌ " : "⚠️ "}
                 {modalTitle}
               </div>
               <button type="button" onClick={closeModal} className="modal-notice-x">✕</button>
             </div>
-            <div className="modal-notice-body">{modalBody}</div>
+            <div className="modal-notice-body" style={{ whiteSpace: "pre-wrap" }}>{modalBody}</div>
             <div className="modal-notice-actions">
               {modalKind === "error" || modalKind === "warning" ? (
                 <button type="button" className="btn btn-secondary" onClick={() => { resetCaptchaHard(); closeModal(); }}>
@@ -188,7 +180,7 @@ export default function ResetPage() {
                 </button>
               ) : null}
               <button type="button" className="btn btn-primary" onClick={closeModal} style={{ width: "auto", marginTop: 0 }}>
-                Ок
+                Понятно
               </button>
             </div>
           </div>
@@ -207,69 +199,114 @@ export default function ResetPage() {
           </div>
 
           <div className="progress-bar">
-            <div className="progress-step" />
+            <div className="progress-step active" />
           </div>
 
-          <h2 className="step-title">Шаг 1. Введите email</h2>
-
-          {showTopBanner ? (
-            <div className="banner warning" style={{ whiteSpace: "pre-line" }}>
-              {bannerText}
-            </div>
-          ) : null}
-
-          {!siteKey ? <div className="banner error-message">Отсутствует ключ конфигурации (NEXT_PUBLIC_TURNSTILE_SITE_KEY)</div> : null}
-
-          <div className="info-box">
-            Мы отправим письмо со ссылкой для сброса. <strong>Пароль изменится только после перехода по ссылке.</strong>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              value={email}
-              onChange={(ev) => setEmail(ev.target.value)}
-              placeholder="Введите ваш email"
-              autoComplete="email"
-            />
-          </div>
-
-          {siteKey ? (
-            <>
-              <div className="captcha-wrapper">
-                <TurnstileWidget
-                  siteKey={siteKey}
-                  action="reset_request"
-                  reloadNonce={reloadNonce}
-                  onToken={(t) => setCaptchaToken(t)}
-                />
+          {sent ? (
+            <div className="success-screen animate-step flex flex-col items-center pt-4">
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-6 shadow-sm">
+                <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              
+              <h3 className="text-2xl font-bold text-slate-900 mb-2 tracking-tight">Письмо отправлено</h3>
+              <p className="text-[15px] text-slate-500 mb-6 text-center leading-relaxed">
+                Мы отправили ссылку для сброса пароля на <strong className="text-slate-800 font-semibold">{email}</strong>.
+              </p>
+              
+              <div className="link mb-4">
+                <Link href="/login" className="font-semibold text-sky-600 hover:text-sky-700">Вернуться ко входу</Link>
               </div>
 
-              {!captchaToken ? (
-                <div className="rate-limit">
-                  <strong>Не отображается проверка?</strong> Нажмите «Перезагрузить капчу» ниже или отключите VPN.
+              <div className="mt-6 p-6 bg-slate-50/50 backdrop-blur-md border border-slate-200/60 rounded-[24px] text-center w-full shadow-sm">
+                <h4 className="text-[15px] font-semibold text-slate-800 mb-3 tracking-tight">
+                  Не можете найти письмо?
+                </h4>
+                
+                <p className="text-[14px] text-slate-500 leading-relaxed mb-5 font-medium">
+                  Иногда автоматические сообщения попадают в папку «Спам». Если письмо оказалось там, пожалуйста, отметьте его как «Не спам» — это очень поможет нашему проекту.
+                </p>
+                
+                <div className="w-10 h-[2px] bg-slate-200 mx-auto mb-5 rounded-full" />
+                
+                <p className="text-[14px] text-slate-500 font-medium">
+                  Письмо так и не пришло?{" "}
+                  <a 
+                    href="https://t.me/skebobingg" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-sky-500 hover:text-sky-600 font-semibold transition-colors decoration-sky-500/30 hover:underline underline-offset-4"
+                  >
+                    Написать в поддержку
+                  </a>
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="wizard-content animate-step">
+              <h2 className="step-title">Шаг 1. Введите email</h2>
+
+              {showTopBanner ? (
+                <div className="banner warning" style={{ whiteSpace: "pre-line" }}>
+                  {bannerText}
                 </div>
               ) : null}
 
-              <button
-                type="button"
-                className="btn btn-captcha-reload"
-                disabled={false}
-                onClick={() => resetCaptchaHard()}
-              >
-                Перезагрузить капчу
+              {!siteKey ? <div className="banner error-message">Отсутствует ключ конфигурации (NEXT_PUBLIC_TURNSTILE_SITE_KEY)</div> : null}
+
+              <div className="info-box">
+                Мы отправим письмо со ссылкой для сброса. <strong>Пароль изменится только после перехода по ссылке.</strong>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="email">Email</label>
+                <input
+                  id="email"
+                  value={email}
+                  onChange={(ev) => setEmail(ev.target.value)}
+                  placeholder="Введите ваш email"
+                  autoComplete="email"
+                />
+              </div>
+
+              {siteKey ? (
+                <>
+                  <div className="captcha-wrapper">
+                    <TurnstileWidget
+                      siteKey={siteKey}
+                      action="reset_request"
+                      reloadNonce={reloadNonce}
+                      onToken={(t) => setCaptchaToken(t)}
+                    />
+                  </div>
+
+                  {!captchaToken ? (
+                    <div className="rate-limit">
+                      <strong>Не отображается проверка?</strong> Нажмите «Перезагрузить капчу» ниже или отключите VPN.
+                    </div>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    className="btn btn-captcha-reload"
+                    disabled={false}
+                    onClick={() => resetCaptchaHard()}
+                  >
+                    Перезагрузить капчу
+                  </button>
+                </>
+              ) : null}
+
+              <button className="btn btn-primary" disabled={!canSubmit} onClick={() => void onSend()}>
+                {busy ? "Отправка..." : "Восстановить пароль"}
               </button>
-            </>
-          ) : null}
 
-          <button className="btn btn-primary" disabled={!canSubmit} onClick={() => void onSend()}>
-            {busy ? "Отправка..." : sent ? "Письмо отправлено" : "Восстановить пароль"}
-          </button>
-
-          <div className="link">
-            Вспомнили пароль? <Link href="/login">Вернуться ко входу</Link>
-          </div>
+              <div className="link mt-6">
+                Вспомнили пароль? <Link href="/login">Вернуться ко входу</Link>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
