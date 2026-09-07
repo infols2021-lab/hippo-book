@@ -18,17 +18,22 @@ jobs:
 
       - name: Install PostgreSQL Client 17
         run: |
-          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
+          sudo apt-get update
+          sudo apt-get install -y curl ca-certificates gnupg
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo $VERSION_CODENAME)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update
           sudo apt-get install -y postgresql-client-17
+          ls -la /usr/lib/postgresql/17/bin/pg_dump
 
       - name: Create Dump
         env:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           TIMESTAMP=$(date +'%Y-%m-%d_%H-%M')
-          pg_dump "$DB_URL" --clean --if-exists --no-owner --no-privileges -f "backup_${TIMESTAMP}.sql"
+          /usr/lib/postgresql/17/bin/pg_dump "$DB_URL" --clean --if-exists --no-owner --no-privileges -f "backup_${TIMESTAMP}.sql"
 
       - name: Save Backup to GitHub Artifacts
         uses: actions/upload-artifact@v4
