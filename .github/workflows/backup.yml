@@ -1,9 +1,12 @@
 name: Database Backup to Google Drive
 
 on:
+  push:
+    branches:
+      - main
   schedule:
-    - cron: '0 0 * * *' # Автозапуск каждый день ночью
-  workflow_dispatch:    # Кнопка для ручного запуска
+    - cron: '0 0 * * *'
+  workflow_dispatch:
 
 jobs:
   backup:
