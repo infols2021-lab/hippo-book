@@ -149,18 +149,12 @@ export default function RegisterPage() {
         return;
       }
 
+      // Все прошло отлично! Отключаем загрузку и показываем наш красивый экран.
+      // Таймер и дублирующая модалка отсюда удалены.
       setBusy(false);
       clearBanner();
-      openModal(
-        "success",
-        "Успешно",
-        json.message || "Регистрация принята.\n\nПроверьте почту и подтвердите email для завершения настройки."
-      );
       setRegistered(true);
 
-      setTimeout(() => {
-        window.location.href = "/login?message=check_email";
-      }, 6000);
     } catch (e: any) {
       setBusy(false);
       clearBanner();
@@ -221,53 +215,79 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <div className="progress-bar">
-            <div className={`progress-step ${step >= 1 ? "active" : ""}`} />
-            <div className={`progress-step ${step >= 2 ? "active" : ""}`} />
-            <div className={`progress-step ${step >= 3 ? "active" : ""}`} />
-          </div>
+          {!registered && (
+            <div className="progress-bar">
+              <div className={`progress-step ${step >= 1 ? "active" : ""}`} />
+              <div className={`progress-step ${step >= 2 ? "active" : ""}`} />
+              <div className={`progress-step ${step >= 3 ? "active" : ""}`} />
+            </div>
+          )}
 
           {showTopBanner ? <div className={`banner ${bannerType}`}>{bannerText}</div> : null}
 
           {!siteKey ? <div className="banner error-message">Ключ защиты не настроен</div> : null}
 
           {registered ? (
-            <div className="success-screen animate-step flex flex-col items-center">
-              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-6 shadow-sm">
-                <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              
-              <h3 className="text-2xl font-bold text-slate-900 mb-2 tracking-tight">Аккаунт создан</h3>
-              <p className="text-[15px] text-slate-500 mb-6 text-center leading-relaxed">
-                Мы отправили ссылку для активации на <strong className="text-slate-800 font-semibold">{email}</strong>. Перейдите по ней, чтобы завершить регистрацию.
-              </p>
-              
-              <div className="link mb-4"><a href="/login" className="font-semibold text-sky-600 hover:text-sky-700">Перейти ко входу</a></div>
+            <div className="success-screen animate-step w-full pt-2">
+              <div className="p-[2px] rounded-[24px] bg-gradient-to-br from-indigo-500 via-purple-500 to-sky-400 shadow-xl shadow-indigo-200/50 w-full mx-auto">
+                <div className="bg-white rounded-[22px] p-6 sm:p-8 text-center relative overflow-hidden flex flex-col items-center">
+                  
+                  {/* Мягкое свечение */}
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-12 bg-indigo-500/10 blur-2xl rounded-full pointer-events-none" />
 
-              <div className="mt-6 p-6 bg-slate-50/50 backdrop-blur-md border border-slate-200/60 rounded-[24px] text-center w-full shadow-sm">
-                <h4 className="text-[15px] font-semibold text-slate-800 mb-3 tracking-tight">
-                  Не можете найти письмо?
-                </h4>
-                
-                <p className="text-[14px] text-slate-500 leading-relaxed mb-5 font-medium">
-                  Иногда автоматические сообщения попадают в папку «Спам». Если письмо оказалось там, пожалуйста, отметьте его как «Не спам» — это очень поможет нашему проекту.
-                </p>
-                
-                <div className="w-10 h-[2px] bg-slate-200 mx-auto mb-5 rounded-full" />
-                
-                <p className="text-[14px] text-slate-500 font-medium">
-                  Письмо так и не пришло?{" "}
+                  {/* Иконка */}
+                  <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center mb-4 border border-emerald-100 shadow-sm z-10">
+                    <svg className="w-6 h-6 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+
+                  <h3 className="relative text-[22px] font-black text-slate-900 mb-1 tracking-tight z-10">
+                    Аккаунт создан
+                  </h3>
+                  <div className="relative text-[14px] text-slate-500 font-medium mb-6 z-10">
+                    Ссылка для активации улетела на <br/>
+                    <span className="inline-block mt-1 px-2.5 py-0.5 bg-indigo-50 text-indigo-700 font-bold rounded-md">
+                      {email}
+                    </span>
+                  </div>
+
+                  {/* БЛОК СО СПАМОМ - СДЕЛАН МАКСИМАЛЬНЫЙ АКЦЕНТ */}
+                  <div className="relative w-full border-t border-slate-100 pt-6 mb-6 z-10">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white px-3 text-[11px] font-black tracking-widest uppercase text-slate-300">
+                      Внимание
+                    </div>
+                    
+                    <h4 className="text-[16px] font-black text-slate-800 mb-2 tracking-tight">
+                      Ищите нас в Спаме
+                    </h4>
+                    <p className="text-[13px] text-slate-500 font-medium mb-4 leading-relaxed px-2">
+                      Если письма нет во входящих, оно точно там. Пожалуйста, откройте его и нажмите эту кнопку:
+                    </p>
+
+                    <div className="inline-block px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[13px] font-black tracking-widest uppercase shadow-lg shadow-slate-900/20 transform hover:-translate-y-0.5 transition-transform cursor-default select-none">
+                      Не спам
+                    </div>
+                  </div>
+
+                  {/* Действия */}
+                  <a 
+                    href="/login" 
+                    className="relative w-full inline-flex items-center justify-center px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[15px] font-bold rounded-xl transition-all shadow-md hover:shadow-lg z-10 mb-5"
+                  >
+                    Перейти ко входу
+                  </a>
+
                   <a 
                     href="https://t.me/skebobingg" 
                     target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-sky-500 hover:text-sky-600 font-semibold transition-colors decoration-sky-500/30 hover:underline underline-offset-4"
+                    rel="noopener noreferrer" 
+                    className="relative text-[13px] font-bold text-slate-400 hover:text-slate-600 transition-colors z-10 underline decoration-slate-200 underline-offset-4"
                   >
-                    Написать в поддержку
+                    Всё равно нет письма? Напишите нам
                   </a>
-                </p>
+
+                </div>
               </div>
             </div>
           ) : (

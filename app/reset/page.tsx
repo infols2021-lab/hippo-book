@@ -198,67 +198,74 @@ export default function ResetPage() {
             </div>
           </div>
 
-          <div className="progress-bar">
-            <div className="progress-step active" />
-          </div>
+          {!sent && (
+            <div className="progress-bar">
+              <div className="progress-step active" />
+            </div>
+          )}
 
           {sent ? (
-            <div className="success-screen animate-step flex flex-col items-center pt-4">
-              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-6 shadow-sm">
-                <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              
-              <h3 className="text-2xl font-bold text-slate-900 mb-2 tracking-tight">Письмо отправлено</h3>
-              <p className="text-[15px] text-slate-500 mb-6 text-center leading-relaxed">
-                Мы отправили ссылку для сброса пароля на <strong className="text-slate-800 font-semibold">{email}</strong>.
-              </p>
-              
-              <div className="link mb-4">
-                <Link href="/login" className="font-semibold text-sky-600 hover:text-sky-700">Вернуться ко входу</Link>
-              </div>
+            <div className="success-screen animate-step w-full pt-2">
+              <div className="p-[2px] rounded-[24px] bg-gradient-to-br from-indigo-500 via-purple-500 to-sky-400 shadow-xl shadow-indigo-200/50 w-full mx-auto">
+                <div className="bg-white rounded-[22px] p-6 sm:p-8 text-center relative overflow-hidden flex flex-col items-center">
+                  
+                  {/* Мягкое свечение */}
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-12 bg-indigo-500/10 blur-2xl rounded-full pointer-events-none" />
 
-              <div className="mt-8 p-[2px] rounded-[24px] bg-gradient-to-br from-indigo-500 via-purple-500 to-sky-400 shadow-lg shadow-indigo-200/50 w-full max-w-md mx-auto">
-                <div className="bg-white rounded-[22px] p-6 text-center relative overflow-hidden">
-                  {/* Мягкое внутреннее свечение */}
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-8 bg-indigo-500/10 blur-xl rounded-full pointer-events-none" />
+                  {/* Иконка */}
+                  <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center mb-4 border border-emerald-100 shadow-sm z-10">
+                    <svg className="w-6 h-6 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
 
-                  <h4 className="relative text-[17px] font-black text-slate-900 mb-2 tracking-tight">
-                    Письмо потерялось?
-                  </h4>
-
-                  <p className="relative text-[14px] text-slate-600 font-medium leading-relaxed mb-5">
-                    Оно могло случайно улететь в папку «Спам». Если найдете его там, обязательно нажмите кнопку:
-                  </p>
-
-                  {/* Фокусный элемент: Имитация кнопки почтовика */}
-                  <div className="relative mb-6">
-                    <span className="inline-block px-4 py-1.5 bg-slate-900 text-white rounded-lg text-[12px] font-black tracking-widest uppercase shadow-md">
-                      Не спам
+                  <h3 className="relative text-[22px] font-black text-slate-900 mb-1 tracking-tight z-10">
+                    Письмо отправлено
+                  </h3>
+                  <div className="relative text-[14px] text-slate-500 font-medium mb-6 z-10">
+                    Ссылка для сброса пароля улетела на <br/>
+                    <span className="inline-block mt-1 px-2.5 py-0.5 bg-indigo-50 text-indigo-700 font-bold rounded-md">
+                      {email}
                     </span>
-                    <p className="mt-2 text-[12.5px] font-semibold text-indigo-600">
-                      Это жизненно важно для нашего проекта.
+                  </div>
+
+                  {/* БЛОК СО СПАМОМ */}
+                  <div className="relative w-full border-t border-slate-100 pt-6 mb-6 z-10">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white px-3 text-[11px] font-black tracking-widest uppercase text-slate-300">
+                      Внимание
+                    </div>
+                    
+                    <h4 className="text-[16px] font-black text-slate-800 mb-2 tracking-tight">
+                      Ищите нас в Спаме
+                    </h4>
+                    <p className="text-[13px] text-slate-500 font-medium mb-4 leading-relaxed px-2">
+                      Если письма нет во входящих, оно точно там. Пожалуйста, откройте его и нажмите эту кнопку:
                     </p>
+
+                    <div className="inline-block px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[13px] font-black tracking-widest uppercase shadow-lg shadow-slate-900/20 transform hover:-translate-y-0.5 transition-transform cursor-default select-none">
+                      Не спам
+                    </div>
                   </div>
 
-                  {/* Блок поддержки */}
-                  <div className="relative flex flex-col items-center justify-center pt-5 border-t border-slate-100">
-                    <span className="text-[13px] font-medium text-slate-400 mb-3">
-                      Всё равно нигде нет?
-                    </span>
-                    <a
-                      href="https://t.me/skebobingg"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center px-6 py-2.5 bg-sky-50 text-sky-600 hover:bg-sky-100 hover:text-sky-700 rounded-xl text-[14px] font-bold transition-colors w-full sm:w-auto"
-                    >
-                      Написать в поддержку
-                    </a>
-                  </div>
+                  {/* Действия */}
+                  <Link 
+                    href="/login" 
+                    className="relative w-full inline-flex items-center justify-center px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[15px] font-bold rounded-xl transition-all shadow-md hover:shadow-lg z-10 mb-5"
+                  >
+                    Вернуться ко входу
+                  </Link>
+
+                  <a 
+                    href="https://t.me/skebobingg" 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="relative text-[13px] font-bold text-slate-400 hover:text-slate-600 transition-colors z-10 underline decoration-slate-200 underline-offset-4"
+                  >
+                    Всё равно нет письма? Напишите нам
+                  </a>
+
                 </div>
               </div>
-
             </div>
           ) : (
             <div className="wizard-content animate-step">
