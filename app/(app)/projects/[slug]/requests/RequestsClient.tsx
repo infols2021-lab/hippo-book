@@ -31,6 +31,7 @@ type MaterialItem = {
   project_tab_id: string | null;
   material_kind: string;
   target_levels?: string[] | null;
+  tabTitle?: string | null;
 };
 
 type PurchaseRequest = {
@@ -55,6 +56,15 @@ type PaymentDisplayItem = {
   effectivePrice: number;
   badgeText?: string;
   isIssued?: boolean;
+  tabTitle?: string | null;
+};
+
+type RequestMaterialMeta = {
+  id: string;
+  title: string;
+  price: number;
+  material_kind?: string;
+  tab_title?: string | null;
 };
 
 type GrantedItem = {
@@ -74,6 +84,7 @@ type Props = {
   userEmail: string;
   userFullName: string;
   initialRequests: PurchaseRequest[];
+  initialRequestMaterials?: RequestMaterialMeta[];
   ownedMaterialIds?: string[];
   initialGrants?: GrantedItem[];
 };
@@ -156,6 +167,43 @@ function normalizeRequestRow(row: any): PurchaseRequest {
   };
 }
 
+// Единый премиальный бейдж названия таба (Use of English, Speaking и т.д.)
+const TAB_BADGE_CLASS =
+  "ml-2 inline-block px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest rounded-md border border-slate-200/60 align-middle";
+
+function TabBadge({ label }: { label: string }) {
+  return <span className={TAB_BADGE_CLASS}>{label}</span>;
+}
+
+// Человекочитаемая подпись типа материала для устаревших заявок без material_ids.
+function formatMaterialKindLabel(kind: string): string {
+  const k = String(kind).trim().toLowerCase();
+  if (!k) return "";
+  if (
+    k === "roadmap" ||
+    k === "road" ||
+    k === "course" ||
+    k === "pathway" ||
+    k === "дорожка" ||
+    k === "курс" ||
+    k.includes("интенсив")
+  ) {
+    return "Интенсив";
+  }
+  if (k === "textbook" || k === "учебник") return "Учебник";
+  if (k === "crossword" || k === "кроссворд") return "Кроссворд";
+  if (k === "mock_test" || k.includes("пробн") || k.includes("mock")) return "Пробный тест";
+  if (k === "material") return "Материал";
+  return String(kind).trim();
+}
+
+function fallbackRequestMaterialsText(r: PurchaseRequest): string {
+  const kinds = (r.material_kinds || []).map(formatMaterialKindLabel);
+  const textbooks = (r.textbook_types || []).map(formatMaterialKindLabel);
+  const parts = Array.from(new Set([...kinds, ...textbooks])).filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : "—";
+}
+
 export default function RequestsClient({
   project,
   availableProjects,
@@ -165,6 +213,7 @@ export default function RequestsClient({
   userEmail,
   userFullName,
   initialRequests,
+  initialRequestMaterials = [],
   ownedMaterialIds = [],
   initialGrants = [],
 }: Props) {
@@ -278,6 +327,25 @@ export default function RequestsClient({
   const [requestDateTime, setRequestDateTime] = useState("");
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
 
+  // Накопительный справочник материалов по id — со ВСЕХ проектов.
+  // Изначально наполняется данными заявок (сервер), дополняется при загрузке каталога.
+  const [materialMetaById, setMaterialMetaById] = useState<Record<string, MaterialItem>>(() => {
+    const map: Record<string, MaterialItem> = {};
+    for (const m of initialRequestMaterials) {
+      map[m.id] = {
+        id: m.id,
+        title: m.title,
+        description: null,
+        cover_image_url: null,
+        price: m.price,
+        project_tab_id: null,
+        material_kind: m.material_kind || "material",
+        tabTitle: m.tab_title ?? null,
+      };
+    }
+    return map;
+  });
+
   const [paymentTotalAmount, setPaymentTotalAmount] = useState(0);
   const [paymentModalItems, setPaymentModalItems] = useState<PaymentDisplayItem[]>([]);
   const [paymentModalSubtitle, setPaymentModalSubtitle] = useState<string>("");
@@ -328,6 +396,20 @@ export default function RequestsClient({
 
   useEffect(() => {
     let alive = true;
+
+    // Обновляем витрину текущего проекта и одновременно пополняем общий справочник
+    // materialMetaById, чтобы корзина и история видели материалы со всех проектов.
+    function applyLoadedMaterials(list: MaterialItem[]) {
+      setMaterials(list);
+      setMaterialMetaById((prev) => {
+        const next = { ...prev };
+        for (const m of list) {
+          next[m.id] = m;
+        }
+        return next;
+      });
+    }
+
     async function loadMaterials() {
       setMaterialsLoading(true);
       try {
@@ -346,8 +428,9 @@ export default function RequestsClient({
               project_tab_id: m.project_tab_id ? String(m.project_tab_id) : null,
               material_kind: String(m.material_kind || ""),
               target_levels: toStringArray(m.target_levels || m.class_levels),
+              tabTitle: null,
             }));
-            setMaterials(list);
+            applyLoadedMaterials(list);
           }
           return;
         }
@@ -375,6 +458,9 @@ export default function RequestsClient({
         const map = new Map<string, MaterialItem>();
 
         for (const m of allFetched) {
+          const matchedTab = m.project_tab_id
+            ? tabs.find((t) => t.id === m.project_tab_id)
+            : undefined;
           const item: MaterialItem = {
             id: String(m.id),
             title: String(m.title || "Материал"),
@@ -384,13 +470,14 @@ export default function RequestsClient({
             project_tab_id: m.project_tab_id ? String(m.project_tab_id) : null,
             material_kind: String(m.material_kind || ""),
             target_levels: toStringArray(m.target_levels || m.class_levels),
+            tabTitle: matchedTab?.title ?? null,
           };
           if (!map.has(item.id)) {
             map.set(item.id, item);
           }
         }
 
-        setMaterials(Array.from(map.values()));
+        applyLoadedMaterials(Array.from(map.values()));
       } catch (e) {
         console.error("Ошибка загрузки материалов витрины:", e);
       } finally {
@@ -407,6 +494,27 @@ export default function RequestsClient({
   useEffect(() => {
     setRequests(initialRequests.map(normalizeRequestRow));
   }, [initialRequests]);
+
+  // После router.refresh() сервер присылает свежие данные о материалах заявок —
+  // мёржим их в общий справочник (не затирая данные текущего каталога).
+  useEffect(() => {
+    setMaterialMetaById((prev) => {
+      const next = { ...prev };
+      for (const m of initialRequestMaterials) {
+        next[m.id] = {
+          id: m.id,
+          title: m.title,
+          description: next[m.id]?.description ?? null,
+          cover_image_url: next[m.id]?.cover_image_url ?? null,
+          price: m.price,
+          project_tab_id: next[m.id]?.project_tab_id ?? null,
+          material_kind: m.material_kind || "material",
+          tabTitle: m.tab_title ?? null,
+        };
+      }
+      return next;
+    });
+  }, [initialRequestMaterials]);
 
   const ownedMaterialSet = useMemo(() => {
     const set = new Set<string>(ownedMaterialIds);
@@ -427,7 +535,7 @@ export default function RequestsClient({
     if (ids.length === 0) return 0;
     let calculated = 0;
     for (const id of ids) {
-      const mat = materials.find((m) => m.id === id);
+      const mat = materialMetaById[id];
       calculated += mat?.price ?? 1000;
     }
     return calculated;
@@ -453,9 +561,12 @@ export default function RequestsClient({
   }, [materials, activeTabId, selectedLevelCode]);
 
   const selectedMaterialsList = useMemo(() => {
-    const set = new Set(selectedMaterialIds);
-    return materials.filter((m) => set.has(m.id));
-  }, [materials, selectedMaterialIds]);
+    // Достаём материалы из общего справочника (все проекты), сохраняя порядок выбора,
+    // чтобы корзина и итоговая цена учитывали позиции из каждого проекта.
+    return selectedMaterialIds
+      .map((id) => materialMetaById[id])
+      .filter(Boolean) as MaterialItem[];
+  }, [materialMetaById, selectedMaterialIds]);
 
   const pendingRequests = useMemo(() => {
     return requests.filter((r) => !r.is_processed);
@@ -469,6 +580,7 @@ export default function RequestsClient({
         title: string;
         count: number;
         unitPrice: number;
+        tabTitle: string | null;
         isIssued: boolean;
       }
     >();
@@ -476,9 +588,10 @@ export default function RequestsClient({
     for (const req of pendingRequests) {
       const ids = toStringArray(req.material_ids);
       for (const id of ids) {
-        const mat = materials.find((m) => m.id === id);
+        const mat = materialMetaById[id];
         const title = mat?.title || "Учебный материал";
         const unitPrice = mat?.price ?? 1000;
+        const tabTitle = mat?.tabTitle ?? null;
         const isIssued = ownedMaterialSet.has(id);
 
         const current = itemsMap.get(id) ?? {
@@ -486,6 +599,7 @@ export default function RequestsClient({
           title,
           count: 0,
           unitPrice,
+          tabTitle,
           isIssued,
         };
         current.count += 1;
@@ -517,6 +631,7 @@ export default function RequestsClient({
         effectivePrice,
         badgeText,
         isIssued: item.isIssued,
+        tabTitle: item.tabTitle,
       };
     });
 
@@ -525,7 +640,7 @@ export default function RequestsClient({
       items,
       count: pendingRequests.length,
     };
-  }, [pendingRequests, materials, ownedMaterialSet]);
+  }, [pendingRequests, materialMetaById, ownedMaterialSet]);
 
   const singleRequestReceipt = useMemo(() => {
     const otherPendingRequests = pendingRequests.filter((r) => r.id !== editingId);
@@ -561,6 +676,7 @@ export default function RequestsClient({
         badgeText,
         isIssued,
         isInOtherPending,
+        tabTitle: m.tabTitle ?? null,
       };
     });
 
@@ -843,6 +959,28 @@ export default function RequestsClient({
     if (price === 0) return "бесплатно";
     return `${price} ₽`;
   };
+
+  // Список материалов заявки с реальными названиями (в т.ч. roadmap) и бейджами табов.
+  function renderRequestMaterialsRow(r: PurchaseRequest) {
+    const items = toStringArray(r.material_ids)
+      .map((id) => materialMetaById[id])
+      .filter(Boolean) as MaterialItem[];
+
+    if (items.length === 0) {
+      return <span style={{ opacity: 0.75 }}>{fallbackRequestMaterialsText(r)}</span>;
+    }
+
+    return (
+      <div className="flex flex-col gap-1">
+        {items.map((m) => (
+          <div key={m.id} className="flex items-center flex-wrap" style={{ columnGap: 2 }}>
+            <span>{m.title}</span>
+            {m.tabTitle ? <TabBadge label={m.tabTitle} /> : null}
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="page-requests">
@@ -1175,7 +1313,10 @@ export default function RequestsClient({
                 {singleRequestReceipt.items.map((m) => (
                   <div key={m.id} className="receipt-item">
                     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                      <span>{m.title}</span>
+                      <span style={{ display: "flex", alignItems: "center", flexWrap: "wrap", rowGap: 2 }}>
+                        {m.title}
+                        {m.tabTitle ? <TabBadge label={m.tabTitle} /> : null}
+                      </span>
                       {m.badgeText && (
                         <span className={`summary-item-badge ${m.isIssued ? "badge-issued" : "badge-in-other"}`}>
                           {m.badgeText}
@@ -1241,7 +1382,13 @@ export default function RequestsClient({
               {paymentModalItems.map((item) => (
                 <div key={item.id} className="summary-item">
                   <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <span className="summary-item-title">{item.title}</span>
+                    <span
+                      className="summary-item-title"
+                      style={{ display: "flex", alignItems: "center", flexWrap: "wrap", rowGap: 2 }}
+                    >
+                      {item.title}
+                      {item.tabTitle ? <TabBadge label={item.tabTitle} /> : null}
+                    </span>
                     {item.badgeText && (
                       <span className={`summary-item-badge ${item.isIssued ? "badge-issued" : "badge-in-other"}`}>
                         {item.badgeText}
@@ -1492,19 +1639,6 @@ export default function RequestsClient({
                     {requests.map((r) => {
                       const locked = r.is_processed;
 
-                      const matchedMaterials = materials.filter(
-                        (m) => r.material_ids && r.material_ids.includes(m.id)
-                      );
-
-                      const displayMaterials =
-                        matchedMaterials.length > 0
-                          ? matchedMaterials.map((m) => m.title).join(", ")
-                          : r.material_kinds?.length
-                          ? r.material_kinds.join(", ")
-                          : r.textbook_types?.length
-                          ? r.textbook_types.join(", ")
-                          : "—";
-
                       const price = getRequestPrice(r);
 
                       return (
@@ -1516,7 +1650,7 @@ export default function RequestsClient({
                             </td>
                           )}
                           <td style={{ opacity: 0.8 }}>{formatDateTime(r.created_at)}</td>
-                          <td>{displayMaterials}</td>
+                          <td>{renderRequestMaterialsRow(r)}</td>
                           <td style={{ fontWeight: 800, color: "var(--project-primary)" }}>
                             {formatPrice(price)}
                           </td>
@@ -1560,19 +1694,6 @@ export default function RequestsClient({
                 {requests.map((r) => {
                   const locked = r.is_processed;
 
-                  const matchedMaterials = materials.filter(
-                    (m) => r.material_ids && r.material_ids.includes(m.id)
-                  );
-
-                  const displayMaterials =
-                    matchedMaterials.length > 0
-                      ? matchedMaterials.map((m) => m.title).join(", ")
-                      : r.material_kinds?.length
-                      ? r.material_kinds.join(", ")
-                      : r.textbook_types?.length
-                      ? r.textbook_types.join(", ")
-                      : "—";
-
                   const price = getRequestPrice(r);
 
                   return (
@@ -1591,7 +1712,7 @@ export default function RequestsClient({
                       )}
 
                       <div className="request-card-body">
-                        <div className="request-card-materials">{displayMaterials}</div>
+                        <div className="request-card-materials">{renderRequestMaterialsRow(r)}</div>
                         <div className="request-card-price">{formatPrice(price)}</div>
                         <div className="request-card-date">{formatDateTime(r.created_at)}</div>
                       </div>

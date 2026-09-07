@@ -1,9 +1,18 @@
 // app/(app)/projects/[slug]/requests/page.tsx
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
+import { toStringArray } from "@/lib/materials/normalize";
 import RequestsClient from "./RequestsClient";
 
 export const revalidate = 0; // Всегда свежие данные
+
+type RequestMaterialMeta = {
+  id: string;
+  title: string;
+  price: number;
+  material_kind?: string;
+  tab_title?: string | null;
+};
 
 export default async function ProjectRequestsPage({
   params,
@@ -136,11 +145,99 @@ export default async function ProjectRequestsPage({
   const tabTitleToId = new Map<string, string>();
   enrichedTabs.forEach((t) => tabTitleToId.set(t.title, t.id));
 
-  // 5. Сохраняем историческую стоимость заявок (все направления пользователя)
+  // 4.1. Материалы из ВСЕХ заявок пользователя (все проекты) — чтобы в истории
+  // корректно показывались реальные названия (включая roadmap), табы и цены.
   const allRequests = requestsRes.data || [];
+
+  const allRequestMaterialIds = Array.from(
+    new Set<string>(allRequests.flatMap((r) => toStringArray(r.material_ids)))
+  );
+
+  let requestMaterialsMap = new Map<string, RequestMaterialMeta>();
+
+  if (allRequestMaterialIds.length > 0) {
+    const [
+      { data: fetchedRequestMats },
+      { data: fetchedRequestTextbooks },
+      { data: fetchedRequestCrosswords },
+    ] = await Promise.all([
+      supabase
+        .from("materials")
+        .select("id, title, price, material_kind, project_tabs(title)")
+        .in("id", allRequestMaterialIds),
+      supabase
+        .from("textbooks")
+        .select("id, title, price")
+        .in("id", allRequestMaterialIds),
+      supabase
+        .from("crosswords")
+        .select("id, title, price")
+        .in("id", allRequestMaterialIds),
+    ]);
+
+    const map = new Map<string, RequestMaterialMeta>();
+
+    for (const m of fetchedRequestMats || []) {
+      const projectTabs = (m as { project_tabs?: { title?: unknown } | { title?: unknown }[] | null })
+        .project_tabs;
+      const rawTabTitle = Array.isArray(projectTabs)
+        ? String(projectTabs[0]?.title ?? "")
+        : String(projectTabs?.title ?? "");
+      map.set(String(m.id), {
+        id: String(m.id),
+        title: String(m.title || "Материал"),
+        price: Number(m.price || 0),
+        material_kind: m.material_kind ? String(m.material_kind) : "material",
+        tab_title: rawTabTitle || null,
+      });
+    }
+
+    for (const m of fetchedRequestTextbooks || []) {
+      if (!map.has(String(m.id))) {
+        map.set(String(m.id), {
+          id: String(m.id),
+          title: String(m.title || "Учебник"),
+          price: Number(m.price || 0),
+          material_kind: "textbook",
+          tab_title: "Учебники",
+        });
+      }
+    }
+
+    for (const m of fetchedRequestCrosswords || []) {
+      if (!map.has(String(m.id))) {
+        map.set(String(m.id), {
+          id: String(m.id),
+          title: String(m.title || "Кроссворд"),
+          price: Number(m.price || 0),
+          material_kind: "crossword",
+          tab_title: "Кроссворды",
+        });
+      }
+    }
+
+    requestMaterialsMap = map;
+  }
+
+  const initialRequestMaterials = Array.from(requestMaterialsMap.values());
+
+  // 5. Сохраняем историческую стоимость заявок (все направления пользователя)
   const enrichedRequests = allRequests.map((r) => {
     if (typeof r.total_price === "number" && r.total_price > 0) {
       return r;
+    }
+
+    // Новая витрина: считаем цену по реальным material_ids —
+    // материалы заявки могут относиться к разным проектам.
+    const ids = toStringArray(r.material_ids);
+    if (ids.length > 0) {
+      const idsPrice = ids.reduce(
+        (sum, id) => sum + (requestMaterialsMap.get(id)?.price || 0),
+        0
+      );
+      if (idsPrice > 0) {
+        return { ...r, total_price: idsPrice };
+      }
     }
 
     const belongsToCurrentProject = !r.project_id || r.project_id === project.id;
@@ -173,6 +270,7 @@ export default async function ProjectRequestsPage({
       userEmail={userProfile?.email || user.email || ""}
       userFullName={userProfile?.full_name || "Ученик"}
       initialRequests={enrichedRequests}
+      initialRequestMaterials={initialRequestMaterials}
       ownedMaterialIds={Array.from(ownedSet)}
       initialGrants={initialGrants}
     />

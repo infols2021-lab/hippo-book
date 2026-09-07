@@ -88,6 +88,14 @@ function isValidUUID(str: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
 }
 
+// Премиальная плашка с названием таба материала (Use of English, Speaking и т.п.)
+const TAB_BADGE_CLASS =
+  "ml-2 inline-block px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest rounded-md border border-slate-200/60 align-middle";
+
+function TabBadge({ label }: { label: string }) {
+  return <span className={TAB_BADGE_CLASS}>{label}</span>;
+}
+
 function renderProjectName(row: RequestRow) {
   if (row.projects?.name) {
     return (
@@ -159,6 +167,17 @@ function renderTypesFallback(row: RequestRow) {
         } else if (str.includes("кроссворд") || str.includes("crossword")) {
           label = "🧩 Кроссворд";
           color = "bg-green-50 text-green-700 border-green-200";
+        } else if (
+          str === "roadmap" ||
+          str === "road" ||
+          str === "course" ||
+          str === "pathway" ||
+          str === "дорожка" ||
+          str === "курс" ||
+          str.includes("интенсив")
+        ) {
+          label = "🗺️ Интенсив";
+          color = "bg-sky-50 text-sky-700 border-sky-200";
         } else {
           label = `📁 ${str.charAt(0).toUpperCase() + str.slice(1)}`;
         }
@@ -206,10 +225,14 @@ function renderRequestedMaterials(row: RequestRow, items?: (MaterialItemMeta | s
   return (
     <div className="flex flex-col gap-1">
       {list.map((g, i) => (
-        <div key={i} className="text-xs font-bold text-gray-800 truncate max-w-[260px]" title={g.title}>
-          📖 {g.title}{" "}
-          {g.tabTitle ? <span className="text-gray-500 font-normal">({g.tabTitle})</span> : null}{" "}
-          {g.count > 1 ? <span className="text-indigo-600 font-extrabold">(x{g.count})</span> : null}
+        <div key={i} className="flex items-center flex-wrap gap-x-1 max-w-[320px]">
+          <span className="text-xs font-bold text-gray-800" title={g.title}>
+            📖 {g.title}
+          </span>
+          {g.tabTitle ? <TabBadge label={g.tabTitle} /> : null}
+          {g.count > 1 ? (
+            <span className="text-indigo-600 font-extrabold text-[11px]">(x{g.count})</span>
+          ) : null}
         </div>
       ))}
     </div>
