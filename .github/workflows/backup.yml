@@ -1,0 +1,55 @@
+name: Database Backup to Google Drive
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Автозапуск каждый день ночью
+  workflow_dispatch:    # Кнопка для ручного запуска
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install DB Tools & Python
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          pip install google-api-python-client google-auth
+
+      - name: Create Dump
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          TIMESTAMP=$(date +'%Y-%m-%d_%H-%M')
+          FILENAME="backup_${TIMESTAMP}.sql.gz"
+          echo "FILENAME=${FILENAME}" >> $GITHUB_ENV
+          pg_dump "$DB_URL" | gzip > "$FILENAME"
+
+      - name: Upload to Google Drive
+        env:
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+          GDRIVE_SA_KEY: ${{ secrets.GDRIVE_SA_KEY }}
+          FILENAME: ${{ env.FILENAME }}
+        run: |
+          python3 - << 'EOF'
+          import os, json
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaFileUpload
+          from google.oauth2 import service_account
+
+          creds = service_account.Credentials.from_service_account_info(
+              json.loads(os.environ['GDRIVE_SA_KEY']), 
+              scopes=['https://www.googleapis.com/auth/drive']
+          )
+          service = build('drive', 'v3', credentials=creds)
+
+          filename = os.environ['FILENAME']
+          service.files().create(
+              body={'name': filename, 'parents': [os.environ['GDRIVE_FOLDER_ID']]}, 
+              media_body=MediaFileUpload(filename, mimetype='application/gzip'), 
+              fields='id'
+          ).execute()
+          EOF
