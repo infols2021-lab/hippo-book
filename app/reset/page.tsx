@@ -219,29 +219,46 @@ export default function ResetPage() {
                 <Link href="/login" className="font-semibold text-sky-600 hover:text-sky-700">Вернуться ко входу</Link>
               </div>
 
-              <div className="mt-6 p-6 bg-slate-50/50 backdrop-blur-md border border-slate-200/60 rounded-[24px] text-center w-full shadow-sm">
-                <h4 className="text-[15px] font-semibold text-slate-800 mb-3 tracking-tight">
-                  Не можете найти письмо?
-                </h4>
-                
-                <p className="text-[14px] text-slate-500 leading-relaxed mb-5 font-medium">
-                  Иногда автоматические сообщения попадают в папку «Спам». Если письмо оказалось там, пожалуйста, отметьте его как «Не спам» — это очень поможет нашему проекту.
-                </p>
-                
-                <div className="w-10 h-[2px] bg-slate-200 mx-auto mb-5 rounded-full" />
-                
-                <p className="text-[14px] text-slate-500 font-medium">
-                  Письмо так и не пришло?{" "}
-                  <a 
-                    href="https://t.me/skebobingg" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-sky-500 hover:text-sky-600 font-semibold transition-colors decoration-sky-500/30 hover:underline underline-offset-4"
-                  >
-                    Написать в поддержку
-                  </a>
-                </p>
+              <div className="mt-8 p-[2px] rounded-[24px] bg-gradient-to-br from-indigo-500 via-purple-500 to-sky-400 shadow-lg shadow-indigo-200/50 w-full max-w-md mx-auto">
+                <div className="bg-white rounded-[22px] p-6 text-center relative overflow-hidden">
+                  {/* Мягкое внутреннее свечение */}
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-8 bg-indigo-500/10 blur-xl rounded-full pointer-events-none" />
+
+                  <h4 className="relative text-[17px] font-black text-slate-900 mb-2 tracking-tight">
+                    Письмо потерялось?
+                  </h4>
+
+                  <p className="relative text-[14px] text-slate-600 font-medium leading-relaxed mb-5">
+                    Оно могло случайно улететь в папку «Спам». Если найдете его там, обязательно нажмите кнопку:
+                  </p>
+
+                  {/* Фокусный элемент: Имитация кнопки почтовика */}
+                  <div className="relative mb-6">
+                    <span className="inline-block px-4 py-1.5 bg-slate-900 text-white rounded-lg text-[12px] font-black tracking-widest uppercase shadow-md">
+                      Не спам
+                    </span>
+                    <p className="mt-2 text-[12.5px] font-semibold text-indigo-600">
+                      Это жизненно важно для нашего проекта.
+                    </p>
+                  </div>
+
+                  {/* Блок поддержки */}
+                  <div className="relative flex flex-col items-center justify-center pt-5 border-t border-slate-100">
+                    <span className="text-[13px] font-medium text-slate-400 mb-3">
+                      Всё равно нигде нет?
+                    </span>
+                    <a
+                      href="https://t.me/skebobingg"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center px-6 py-2.5 bg-sky-50 text-sky-600 hover:bg-sky-100 hover:text-sky-700 rounded-xl text-[14px] font-bold transition-colors w-full sm:w-auto"
+                    >
+                      Написать в поддержку
+                    </a>
+                  </div>
+                </div>
               </div>
+
             </div>
           ) : (
             <div className="wizard-content animate-step">

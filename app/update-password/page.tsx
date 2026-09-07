@@ -284,21 +284,43 @@ export default function UpdatePasswordPage() {
       {modalOpen ? (
         <div className="modal-notice-overlay" onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
           <div className="modal-notice">
-            <div className="modal-notice-head">
-              <div style={{ fontWeight: 800, fontSize: 18, color: "#1e293b" }}>
-                {modalKind === "success" ? "🎉 " : modalKind === "error" ? "❌ " : "⚠️ "}
-                {modalTitle}
-              </div>
-              <button type="button" onClick={closeModal} className="modal-notice-x">✕</button>
+            <div className="modal-notice-head flex items-center gap-3 border-b border-slate-100 pb-3 mb-2">
+              {modalKind === "success" && (
+                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              )}
+              {modalKind === "error" && (
+                <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </div>
+              )}
+              {modalKind === "warning" && (
+                <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+              )}
+              <div className="font-black text-lg text-slate-900 tracking-tight">{modalTitle}</div>
+              <button type="button" onClick={closeModal} className="ml-auto text-slate-400 hover:text-slate-600 transition-colors">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
             </div>
-            <div className="modal-notice-body">{modalBody}</div>
-            <div className="modal-notice-actions">
+            <div className="modal-notice-body text-slate-500 font-medium text-[14px] leading-relaxed whitespace-pre-wrap py-2">
+              {modalBody}
+            </div>
+            <div className="modal-notice-actions mt-4 pt-4 border-t border-slate-50 flex gap-3 justify-end">
               {modalKind === "error" || modalKind === "warning" ? (
-                <button type="button" className="btn btn-secondary" onClick={() => { resetCaptchaHard(); closeModal(); }}>
+                <button type="button" className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors text-[13px]" onClick={() => { resetCaptchaHard(); closeModal(); }}>
                   Перезагрузить капчу
                 </button>
               ) : null}
-              <button type="button" className="btn btn-primary" onClick={closeModal} style={{ width: "auto", marginTop: 0 }}>
+              <button type="button" className="px-6 py-2.5 bg-slate-900 hover:bg-black text-white font-bold rounded-xl transition-colors text-[13px]" onClick={closeModal}>
                 Понятно
               </button>
             </div>
@@ -323,28 +345,43 @@ export default function UpdatePasswordPage() {
           </div>
 
           <h2 className="step-title">
-            {!ready ? "Проверка ссылки..." : !hasSession ? "Доступ ограничен" : "Шаг 2. Новый пароль"}
+            {!ready ? "Проверка ссылки" : !hasSession ? "Доступ ограничен" : "Шаг 2. Новый пароль"}
           </h2>
 
           {showTopBanner ? (
-            <div className={`banner ${bannerType}`} style={{ whiteSpace: "pre-line" }}>
+            <div className={`banner ${bannerType} whitespace-pre-line`}>
               {bannerText}
             </div>
           ) : null}
 
           {!ready ? (
-            <div className="info-box">Проверка защищенного соединения...</div>
+            <div className="flex flex-col items-center justify-center py-10 animate-pulse">
+              <div className="w-10 h-10 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin mb-4" />
+              <p className="text-slate-500 font-medium text-[14px]">Устанавливаем защищенное соединение...</p>
+            </div>
           ) : !hasSession ? (
-            <div className="info-box">
-              <strong>Доступ ограничен.</strong><br />Для смены пароля необходимо использовать персональную ссылку из электронного письма.
-              <div style={{ marginTop: 14 }}>
-                <Link className="btn btn-primary" href="/reset">
-                  Запросить ссылку
+            <div className="mt-6 p-[2px] rounded-[24px] bg-gradient-to-br from-rose-400 via-orange-400 to-rose-500 shadow-lg shadow-rose-200/50 w-full text-center">
+              <div className="bg-white rounded-[22px] p-8 relative overflow-hidden">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-8 bg-rose-500/10 blur-xl rounded-full pointer-events-none" />
+                
+                <div className="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-rose-100 shadow-sm">
+                  <svg className="w-7 h-7 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
+
+                <h3 className="relative text-[18px] font-black text-slate-900 mb-2 tracking-tight">Ссылка устарела</h3>
+                <p className="relative text-[14px] text-slate-500 font-medium leading-relaxed mb-6">
+                  По соображениям безопасности ссылки для сброса пароля живут ограниченное время. Эта ссылка больше не работает.
+                </p>
+
+                <Link href="/reset" className="inline-flex items-center justify-center w-full px-6 py-3 bg-slate-900 hover:bg-black text-white text-[14px] font-bold rounded-xl transition-all shadow-md">
+                  Запросить новую ссылку
                 </Link>
               </div>
             </div>
           ) : (
-            <>
+            <div className="animate-step">
               {!siteKey ? <div className="banner error-message">Отсутствует конфигурация безопасности</div> : null}
 
               <div className="form-group">
@@ -371,14 +408,15 @@ export default function UpdatePasswordPage() {
                   autoComplete="new-password"
                 />
                 {confirm && password !== confirm && (
-                  <div className="field-error" style={{ color: "#ef4444", fontSize: "12px", marginTop: "4px" }}>
-                    Введенные пароли не совпадают
+                  <div className="text-[12px] font-semibold text-rose-500 mt-1.5 flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    Пароли не совпадают
                   </div>
                 )}
               </div>
 
               {siteKey ? (
-                <>
+                <div className="mt-2 mb-6">
                   <div className="captcha-wrapper">
                     <TurnstileWidget
                       siteKey={siteKey}
@@ -389,7 +427,7 @@ export default function UpdatePasswordPage() {
                   </div>
 
                   {!captchaToken ? (
-                    <div className="rate-limit">
+                    <div className="text-[13px] text-slate-500 font-medium mb-3">
                       Не отображается проверка? Нажмите «Перезагрузить капчу».
                     </div>
                   ) : null}
@@ -397,17 +435,19 @@ export default function UpdatePasswordPage() {
                   <button type="button" className="btn btn-captcha-reload" disabled={false} onClick={() => resetCaptchaHard()}>
                     Перезагрузить капчу
                   </button>
-                </>
+                </div>
               ) : null}
 
-              <button className="btn btn-primary" disabled={!canSubmit} onClick={() => void onUpdate()}>
+              <button className="btn btn-primary w-full" disabled={!canSubmit} onClick={() => void onUpdate()}>
                 {busy ? "Сохранение..." : "Подтвердить смену"}
               </button>
 
-              <div className="link">
-                <Link href="/login">Отменить и вернуться ко входу</Link>
+              <div className="link mt-6">
+                <Link href="/login" className="text-slate-500 hover:text-slate-800 font-semibold transition-colors">
+                  Отменить и вернуться ко входу
+                </Link>
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>
