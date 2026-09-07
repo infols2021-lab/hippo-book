@@ -7,6 +7,7 @@ import "@/app/(app)/projects/[slug]/assignment/assignment.css";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
+import TurnstileWidget from "@/components/TurnstileWidget";
 
 // Импортируем боевые компоненты заданий для песочницы
 import QuestionTest from "@/app/(app)/projects/[slug]/assignment/components/QuestionTest";
@@ -325,6 +326,10 @@ function LoginPageContent() {
   const [busy, setBusy] = useState(false);
   const [networkIssue, setNetworkIssue] = useState(false);
 
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+  const [resendCaptchaToken, setResendCaptchaToken] = useState<string | null>(null);
+  const [resendReloadNonce, setResendReloadNonce] = useState(0);
+
   // Модальные окна
   const [helpOpen, setHelpOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
@@ -412,22 +417,37 @@ function LoginPageContent() {
 
   async function resendConfirmation(emailValue: string) {
     try {
+      if (siteKey && !resendCaptchaToken) {
+        showBanner(
+          "error",
+          "Пройдите проверку безопасности, затем нажмите «Отправить письмо активации повторно»."
+        );
+        return;
+      }
+
       setBusy(true);
       const res = await fetch("/api/auth/resend-confirmation", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: emailValue }),
+        body: JSON.stringify({
+          email: emailValue,
+          ...(siteKey && resendCaptchaToken ? { captchaToken: resendCaptchaToken } : {}),
+        }),
       });
 
       const json = await readApiPayload(res);
       const payload = unwrapApiData(json);
 
       if (!res.ok || !json?.ok) {
+        setResendCaptchaToken(null);
+        setResendReloadNonce((n) => n + 1);
         showBanner("error", extractErrorMessage(payload, json, "Не удалось отправить письмо подтверждения."));
         return;
       }
 
       setShowResendBtn(false);
+      setResendCaptchaToken(null);
+      setResendReloadNonce((n) => n + 1);
       showBanner(
         "success",
         payload?.message || json?.message || "Письмо с подтверждением отправлено повторно. Проверьте почту."
@@ -457,6 +477,7 @@ function LoginPageContent() {
 
     setNetworkIssue(false);
     setShowResendBtn(false);
+    setResendCaptchaToken(null);
 
     try {
       setBusy(true);
@@ -487,8 +508,12 @@ function LoginPageContent() {
         }
 
         if (code === "EMAIL_NOT_CONFIRMED" || msg.toLowerCase().includes("email не подтверж")) {
-          showBanner("error", "Email не подтвержден. Проверьте вашу почту и подтвердите регистрацию.");
+          showBanner(
+            "error",
+            "Email не подтвержден. Для входа подтвердите регистрацию по ссылке из письма. Если письмо не поступило, воспользуйтесь кнопкой ниже."
+          );
           setShowResendBtn(true);
+          setResendCaptchaToken(null);
         } else if (code === "INVALID_CREDENTIALS") {
           showBanner("error", "Неверный email или пароль. Если вы забыли пароль, воспользуйтесь восстановлением.");
         } else if (code === "RATE_LIMIT") {
@@ -542,15 +567,27 @@ function LoginPageContent() {
     return (
       <div className={cls} style={{ display: "block", whiteSpace: "pre-line", marginBottom: "1rem" }}>
         {bannerText}
+        {showResendBtn && siteKey && (
+          <div style={{ marginTop: "10px", display: "flex", justifyContent: "center" }}>
+            <div style={{ background: "#ffffff", borderRadius: "10px", padding: "6px" }}>
+              <TurnstileWidget
+                siteKey={siteKey}
+                action="resend_confirmation"
+                reloadNonce={resendReloadNonce}
+                onToken={(t) => setResendCaptchaToken(t)}
+              />
+            </div>
+          </div>
+        )}
         {showResendBtn && (
           <div style={{ marginTop: "8px" }}>
             <button
               type="button"
               className="btn-secondary-action"
               onClick={() => void resendConfirmation(email.trim().toLowerCase())}
-              disabled={busy}
+              disabled={busy || (!!siteKey && !resendCaptchaToken)}
             >
-              Отправить письмо повторно
+              Отправить письмо активации повторно
             </button>
           </div>
         )}

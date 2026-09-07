@@ -223,7 +223,7 @@ export default function ResetPage() {
                     Письмо отправлено
                   </h3>
                   <div className="relative text-[14px] text-slate-500 font-medium mb-6 z-10">
-                    Ссылка для сброса пароля улетела на <br/>
+                    Ссылка для сброса пароля отправлена на адрес:<br/>
                     <span className="inline-block mt-1 px-2.5 py-0.5 bg-indigo-50 text-indigo-700 font-bold rounded-md">
                       {email}
                     </span>
@@ -236,10 +236,10 @@ export default function ResetPage() {
                     </div>
                     
                     <h4 className="text-[16px] font-black text-slate-800 mb-2 tracking-tight">
-                      Ищите нас в Спаме
+                      Проверьте папку «Спам»
                     </h4>
                     <p className="text-[13px] text-slate-500 font-medium mb-4 leading-relaxed px-2">
-                      Если письма нет во входящих, оно точно там. Пожалуйста, откройте его и нажмите эту кнопку:
+                      Если письмо не поступило во «Входящие», вероятно, оно попало в спам. Пожалуйста, откройте его и нажмите:
                     </p>
 
                     <div className="inline-block px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[13px] font-black tracking-widest uppercase shadow-lg shadow-slate-900/20 transform hover:-translate-y-0.5 transition-transform cursor-default select-none">
