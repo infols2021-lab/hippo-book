@@ -119,9 +119,12 @@ export async function POST(req: NextRequest) {
 
     const origin = req.nextUrl?.origin || "https://hipposha-book.ru";
 
+    // Продамусу отдаём request_number как order_id — вебхук ищет заявку по нему.
+    const orderId = normalizeString(requestRow.request_number) || requestRow.id;
+
     const url = buildProdamusPaymentUrl(
       {
-        id: requestRow.id,
+        id: orderId,
         email: normalizeString(requestRow.email),
         total_price: Number(requestRow.total_price) || 0,
         materialNames,
@@ -132,7 +135,7 @@ export async function POST(req: NextRequest) {
       }
     );
 
-    console.log("[ProdamusLink] OK order_id=", requestRow.id);
+    console.log("[ProdamusLink] OK request_id=", requestRow.id, "order_id=", orderId);
     return ok({ url }, noStoreInit());
   } catch (error) {
     const message =

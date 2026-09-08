@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { isValidUUID } from "@/lib/api/validate";
 import {
   parseProdamusBody,
   verifyProdamusSignature,
@@ -13,19 +14,6 @@ import { logProdamusPayment } from "@/lib/integrations/googleSheets";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-/** Статусы платежа, которые считаем успешными. Пустой статус тоже = успех. */
-const SUCCESS_PAYMENT_STATUSES = new Set([
-  "success",
-  "succeeded",
-  "paid",
-  "payment_succeeded",
-  "payment_success",
-  "completed",
-  "ok",
-  "1",
-  "true",
-]);
 
 type RequestRow = {
   id: string;
@@ -59,6 +47,49 @@ function errorMessage(error: unknown, fallback = "Unknown error") {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
   return fallback;
+}
+
+/**
+ * Ищет заявку по orderRef (Продамус возвращает наш id в order_num или order_id).
+ * Сначала пробуем request_number, затем id (uuid) — железобетонно для обоих сценариев.
+ */
+async function findRequestByOrderRef(
+  supabase: SupabaseClient,
+  orderRef: string,
+): Promise<RequestRow | null> {
+  // 1) По request_number (человекочитаемый PR-номер).
+  const byNumber = await supabase
+    .from("purchase_requests")
+    .select("*")
+    .eq("request_number", orderRef)
+    .maybeSingle();
+
+  if (byNumber.data) {
+    return byNumber.data as RequestRow;
+  }
+  if (byNumber.error) {
+    console.error("[ProdamusWebhook] Ошибка поиска по request_number:", byNumber.error.message);
+  }
+
+  // 2) По id (uuid) — только если это валидный uuid, чтобы не ловить ошибку каста.
+  if (isValidUUID(orderRef)) {
+    const byId = await supabase
+      .from("purchase_requests")
+      .select("*")
+      .eq("id", orderRef)
+      .maybeSingle();
+
+    if (byId.data) {
+      return byId.data as RequestRow;
+    }
+    if (byId.error) {
+      console.error("[ProdamusWebhook] Ошибка поиска по id:", byId.error.message);
+    }
+  } else {
+    console.log("[ProdamusWebhook] orderRef не похож на uuid, поиск по id пропущен.");
+  }
+
+  return null;
 }
 
 /**
@@ -239,92 +270,129 @@ async function syncProdamusSheet(supabase: SupabaseClient, requestRow: RequestRo
 export async function POST(req: NextRequest) {
   const contentType = String(req.headers.get("content-type") ?? "");
 
-  // 1. Парсим тело (json или form в зависимости от content-type).
-  let body: Record<string, unknown>;
+  // 1. Сырое тело + лог входящего запроса.
+  let rawBody = "";
   try {
-    body = await parseProdamusBody(req);
+    rawBody = await req.text();
   } catch (error) {
-    console.error("[ProdamusWebhook] Failed to parse body:", errorMessage(error));
+    console.error("[ProdamusWebhook] Не удалось прочитать тело:", errorMessage(error));
     return new Response("Bad Request", { status: 400 });
   }
 
-  // 2. Верификация подписи Sign.
+  console.log("[ProdamusWebhook] Входящий вебхук. content-type=", contentType);
+  console.log("[ProdamusWebhook] Сырое тело:", rawBody.slice(0, 4000) || "(пусто)");
+
   const signHeader = req.headers.get("Sign");
+  console.log("[ProdamusWebhook] Заголовок Sign:", signHeader ?? "(отсутствует)");
+
+  // 2. Парсинг тела (json или urlencoded).
+  const body = parseProdamusBody(rawBody, contentType);
+
+  if (!body || Object.keys(body).length === 0) {
+    console.error("[ProdamusWebhook] Тело пустое или не распарсилось. content-type=", contentType);
+    return new Response("Bad Request", { status: 400 });
+  }
+
+  // 3. Верификация подписи.
   const valid = verifyProdamusSignature(body, signHeader);
+  console.log("[ProdamusWebhook] Результат проверки подписи:", valid ? "OK" : "FAIL");
 
   if (!valid) {
-    const orderIdHint = String(body?.order_id ?? "").slice(0, 64);
     console.error(
-      "[ProdamusWebhook][HACK?] Невалидная подпись Sign. order_id=" +
-        orderIdHint +
-        " content-type=" +
-        contentType +
-        " sign-length=" +
-        String(signHeader?.length ?? 0),
+      "[ProdamusWebhook][HACK?] Невалидная подпись Sign. body=",
+      JSON.stringify(body).slice(0, 2000),
     );
     return new Response("Bad Request", { status: 400 });
   }
 
-  // 3. order_id — это id заявки из purchase_requests.
-  const orderId = String(body?.order_id ?? "").trim();
-  if (!orderId) {
-    console.error("[ProdamusWebhook] Missing order_id in verified payload");
+  // 4. order_ref: Продамус возвращает наш id в order_num (иногда в order_id).
+  const orderRef = String(body?.order_num ?? body?.order_id ?? "").trim();
+  console.log(
+    "[ProdamusWebhook] order_num=",
+    String(body?.order_num ?? ""),
+    "| order_id=",
+    String(body?.order_id ?? ""),
+    "| orderRef=",
+    orderRef,
+  );
+
+  if (!orderRef) {
+    console.error("[ProdamusWebhook] В payload нет order_num/order_id");
     return new Response("Bad Request", { status: 400 });
   }
 
-  // 4. Защитная проверка статуса: обрабатываем только успешные оплаты.
-  const rawStatus = String(body?.payment_status ?? body?.status ?? "").toLowerCase();
-  if (rawStatus && !SUCCESS_PAYMENT_STATUSES.has(rawStatus)) {
-    console.warn("[ProdamusWebhook] Платёж не успешен, пропускаем. order_id=" + orderId, rawStatus);
+  // 5. Статус платежа: выдаём доступы только при payment_status = success.
+  const paymentStatusRaw = String(body?.payment_status ?? "").trim();
+  const paymentStatus = paymentStatusRaw.toLowerCase();
+  console.log("[ProdamusWebhook] payment_status=", JSON.stringify(paymentStatusRaw));
+
+  if (paymentStatus && paymentStatus !== "success") {
+    console.warn(
+      "[ProdamusWebhook] payment_status != 'success' -> пропускаем выдачу. orderRef=" + orderRef,
+    );
     return new Response("OK", { status: 200 });
+  }
+
+  if (!paymentStatus) {
+    console.warn("[ProdamusWebhook] payment_status отсутствует в payload — продолжаем по умолчанию.");
   }
 
   const supabase = getSupabaseAdminClient();
 
-  // 5. Поиск заявки по order_id.
-  const { data: requestRow, error: loadErr } = await supabase
-    .from("purchase_requests")
-    .select("*")
-    .eq("id", orderId)
-    .maybeSingle();
-
-  if (loadErr) {
-    // Ошибка БД — вернём 500, чтобы Продамус повторил доставку.
-    console.error("[ProdamusWebhook] DB load error:", loadErr.message);
-    return new Response("Internal Server Error", { status: 500 });
-  }
+  // 6. Поиск заявки: сначала по request_number, затем по id (uuid).
+  const requestRow = await findRequestByOrderRef(supabase, orderRef);
 
   if (!requestRow) {
-    // Подпись валидна, но заявка не найдена (удалена / заказ не наш). Не долбим ретраями.
-    console.warn("[ProdamusWebhook] Заявка не найдена по order_id=", orderId);
+    console.error("[ProdamusWebhook] Заявка не найдена по orderRef=", orderRef);
     return new Response("OK", { status: 200 });
   }
 
-  // 6. Идемпотентность: повторный вебхук по обработанной заявке.
+  console.log(
+    "[ProdamusWebhook] Заявка найдена:",
+    JSON.stringify({
+      id: requestRow.id,
+      request_number: requestRow.request_number,
+      user_id: requestRow.user_id,
+      material_ids: requestRow.material_ids ?? [],
+      total_price: requestRow.total_price ?? null,
+      email: requestRow.email ?? "",
+      full_name: requestRow.full_name ?? "",
+      is_processed: requestRow.is_processed,
+    }),
+  );
+
+  // 7. Идемпотентность: повторный вебхук по обработанной заявке.
   if (requestRow.is_processed === true) {
-    console.log("[ProdamusWebhook] Повторный вебхук, заявка уже обработана. order_id=", orderId);
+    console.log("[ProdamusWebhook] Повторный вебхук, заявка уже обработана. id=", requestRow.id);
     return new Response("OK", { status: 200 });
   }
 
-  // 7. Выдача доступов + пометка обработанной.
+  // 8. Выдача доступов + пометка обработанной.
   try {
-    await grantAndMarkProcessed(supabase, requestRow);
+    console.log("[ProdamusWebhook] Начинаем выдачу доступов. id=", requestRow.id);
+    const grantResult = await grantAndMarkProcessed(supabase, requestRow);
+    console.log(
+      "[ProdamusWebhook] Доступы выданы. grants=",
+      grantResult.grantsToStoreCount,
+      "id=",
+      requestRow.id,
+    );
   } catch (error) {
     // До is_processed=true ещё не дошли (или дошли частично, но всё идемпотентно).
     // Отдаём 500, чтобы Продамус повторил доставку и процесс завершился.
     console.error(
-      "[ProdamusWebhook] Processing error:",
+      "[ProdamusWebhook] Ошибка при выдаче доступов:",
       errorMessage(error),
-      "order_id=",
-      orderId,
+      "id=",
+      requestRow.id,
     );
     return new Response("Internal Server Error", { status: 500 });
   }
 
-  // 8. Google Sheets (отдельный лист) — не роняет выдачу.
+  // 9. Google Sheets (отдельный лист) — не роняет выдачу.
   await syncProdamusSheet(supabase, requestRow);
 
-  console.log("[ProdamusWebhook] Заявка обработана автоматически. order_id=", orderId);
+  console.log("[ProdamusWebhook] Заявка обработана автоматически. id=", requestRow.id);
   return new Response("OK", { status: 200 });
 }
 

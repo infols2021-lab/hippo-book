@@ -181,28 +181,46 @@ export function verifyProdamusSignature(
 // ----------------------------------------------------------------------------
 
 /**
- * Парсит тело вебхука Продамуса в JS-объект.
+ * Парсит сырое тело вебхука Продамуса в JS-объект.
  *
  * Продамус может слать как application/json, так и
- * application/x-www-form-urlencoded / multipart/form-data.
- * Вернувшийся объект передаётся в verifyProdamusSignature как есть.
+ * application/x-www-form-urlencoded. Вернувшийся объект передаётся
+ * в verifyProdamusSignature как есть.
+ *
+ * @param rawBody     Сырое тело запроса (req.text())
+ * @param contentType Значение заголовка content-type
  */
-export async function parseProdamusBody(req: Request): Promise<Record<string, unknown>> {
-  const contentType = String(req.headers.get("content-type") ?? "").toLowerCase();
+export function parseProdamusBody(
+  rawBody: string,
+  contentType?: string | null,
+): Record<string, unknown> {
+  const type = String(contentType ?? "").toLowerCase();
+  const text = String(rawBody ?? "").trim();
 
-  if (contentType.includes("application/json")) {
-    const json: unknown = await req.json();
-    return json && typeof json === "object" && !Array.isArray(json)
-      ? (json as Record<string, unknown>)
-      : {};
+  if (!text) {
+    return {};
   }
 
-  // urlencoded / multipart: плоский словарь key => value.
-  const formData = await req.formData();
+  if (type.includes("application/json")) {
+    try {
+      const json: unknown = JSON.parse(text);
+      return json && typeof json === "object" && !Array.isArray(json)
+        ? (json as Record<string, unknown>)
+        : {};
+    } catch {
+      return {};
+    }
+  }
+
+  // urlencoded: плоский словарь key => value.
   const obj: Record<string, unknown> = {};
 
-  for (const [key, value] of formData.entries()) {
-    obj[key] = typeof value === "string" ? value : String(value);
+  try {
+    for (const [key, value] of new URLSearchParams(text).entries()) {
+      obj[key] = typeof value === "string" ? value : String(value);
+    }
+  } catch {
+    return obj;
   }
 
   return obj;
