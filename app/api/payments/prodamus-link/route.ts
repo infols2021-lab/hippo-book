@@ -33,22 +33,34 @@ async function safeJson(req: NextRequest) {
  * необработанных заявок текущего пользователя.
  */
 export async function POST(req: NextRequest) {
-  const auth = await requireUser();
-  if ("response" in auth) return auth.response;
-
-  const { supabase, user } = auth;
-
-  const body = await safeJson(req);
-  if (!body || typeof body !== "object" || Array.isArray(body)) {
-    return fail("Bad JSON", 400, "BAD_JSON", noStoreInit());
-  }
-
-  const requestId = normalizeString(body?.request_id);
-  if (!requestId || !isValidUUID(requestId)) {
-    return fail("request_id required", 400, "VALIDATION", noStoreInit());
-  }
-
   try {
+    const auth = await requireUser();
+    if ("response" in auth) return auth.response;
+
+    const { supabase, user } = auth;
+
+    const body = await safeJson(req);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return fail("Bad JSON", 400, "BAD_JSON", noStoreInit());
+    }
+
+    const requestId = normalizeString(body?.request_id);
+    if (!requestId || !isValidUUID(requestId)) {
+      return fail("request_id required", 400, "VALIDATION", noStoreInit());
+    }
+
+    // Проверяем конфиг до всех вызовов, чтобы клиент видел точную причину.
+    const storeUrl = normalizeString(process.env.PRODAMUS_STORE_URL);
+    if (!storeUrl) {
+      console.error("[ProdamusLink] PRODAMUS_STORE_URL is not configured");
+      return fail(
+        "Платёжная система не настроена: не задан PRODAMUS_STORE_URL",
+        500,
+        "PAYMENT_NOT_CONFIGURED",
+        noStoreInit()
+      );
+    }
+
     const { data: requestRow, error: loadErr } = await supabase
       .from("purchase_requests")
       .select(
@@ -59,7 +71,8 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (loadErr) {
-      return fail(loadErr.message, 500, "DB_ERROR", noStoreInit());
+      console.error("[ProdamusLink] DB load error:", loadErr.message);
+      return fail(loadErr.message, 500, "PAYMENT_LOAD_ERROR", noStoreInit());
     }
 
     if (!requestRow) {
@@ -75,10 +88,15 @@ export async function POST(req: NextRequest) {
     let materialNames: string[] = [];
 
     if (materialIds.length > 0) {
-      const { data: materials } = await supabase
+      const { data: materials, error: materialsErr } = await supabase
         .from("materials")
         .select("id, title")
         .in("id", materialIds);
+
+      if (materialsErr) {
+        console.error("[ProdamusLink] Materials load error:", materialsErr.message);
+        return fail(materialsErr.message, 500, "PAYMENT_LOAD_ERROR", noStoreInit());
+      }
 
       const titleById = new Map<string, string>(
         (materials ?? []).map((mat: { id?: string; title?: string | null }) => [
@@ -114,9 +132,12 @@ export async function POST(req: NextRequest) {
       }
     );
 
+    console.log("[ProdamusLink] OK order_id=", requestRow.id);
     return ok({ url }, noStoreInit());
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error || "Server error");
-    return fail(message, 500, "SERVER_ERROR", noStoreInit());
+    const message =
+      error instanceof Error ? error.message : String(error || "Unknown server error");
+    console.error("[ProdamusLink] Unexpected error:", message);
+    return fail(message, 500, "PAYMENT_LINK_ERROR", noStoreInit());
   }
 }
