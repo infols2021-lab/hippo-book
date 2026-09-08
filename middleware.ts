@@ -30,6 +30,13 @@ function forbiddenJson() {
 }
 
 export async function middleware(req: NextRequest) {
+  // Вебхук Продамуса — публичный роут без пользовательской сессии.
+  // Продамус стучится сюда сервер-к-серверу, поэтому пропускаем любые проверки
+  // авторизации и редиректы (в т.ч. на всякий случай, если изменится matcher ниже).
+  if (req.nextUrl.pathname.startsWith("/api/webhooks/prodamus")) {
+    return NextResponse.next();
+  }
+
   const res = NextResponse.next();
   const supabase = createSupabaseMiddlewareClient(req, res);
 
