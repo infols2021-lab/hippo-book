@@ -348,3 +348,96 @@ export async function deleteRequestRowByNumber(requestNumber: string, customTabN
     rowNumber,
   };
 }
+
+// ----------------------------------------------------------------------------
+// Prodamus: успешные оплаты на отдельном листе
+// ----------------------------------------------------------------------------
+
+const PRODAMUS_COLUMNS = "A:E";
+const PRODAMUS_COLUMNS_COUNT = 5;
+
+export type ProdamusPaymentRecord = {
+  /** ФИО покупателя (из purchase_requests.full_name). */
+  fullName: string;
+  /** Email покупателя. */
+  email: string;
+  /** Сумма оплаты (purchase_requests.total_price). */
+  totalPrice: number;
+  /** Дата оплаты в ISO. */
+  paidAt: string;
+  /** Названия оплаченных материалов. */
+  materialTitles: string[];
+};
+
+function formatDateRU(value: string | number | Date) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${day}.${month}.${year} ${hours}:${minutes}`;
+}
+
+function normalizeProdamusValues(record: ProdamusPaymentRecord) {
+  const materialTitles = (Array.isArray(record.materialTitles) ? record.materialTitles : [])
+    .map((title) => norm(title))
+    .filter(Boolean);
+
+  const row = [
+    norm(record.fullName) || "—",
+    norm(record.email),
+    Number(record.totalPrice) || 0,
+    record.paidAt ? formatDateRU(record.paidAt) : formatDateRU(new Date()),
+    materialTitles.join(", ") || "—",
+  ];
+
+  return Array.from({ length: PRODAMUS_COLUMNS_COUNT }, (_, index) => row[index] ?? "");
+}
+
+/**
+ * Записать данные об успешной оплате Продамуса на отдельный лист.
+ *
+ * Структура строки (A:E): ФИО, email, сумма, дата, перечень материалов.
+ * Имя листа берётся из GOOGLE_SHEETS_PRODAMUS_TAB.
+ *
+ * @param record Данные оплаты
+ * @param customTabName Опциональное переопределение имени листа
+ */
+export async function logProdamusPayment(
+  record: ProdamusPaymentRecord,
+  customTabName?: string | null,
+) {
+  const sheets = getSheetsClient();
+  const spreadsheetId = mustEnv("GOOGLE_SHEETS_SPREADSHEET_ID");
+  const tab = customTabName || mustEnv("GOOGLE_SHEETS_PRODAMUS_TAB");
+
+  const res = await sheets.spreadsheets.values.append(
+    {
+      spreadsheetId,
+      range: range(tab, PRODAMUS_COLUMNS),
+      valueInputOption: "USER_ENTERED",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: {
+        values: [normalizeProdamusValues(record)],
+      },
+    },
+    {
+      timeout: GOOGLE_API_TIMEOUT_MS,
+    },
+  );
+
+  const updatedRange = res.data.updates?.updatedRange ?? null;
+  const rowNumber = parseRowNumber(updatedRange);
+
+  return {
+    updatedRange,
+    rowNumber,
+  };
+}
