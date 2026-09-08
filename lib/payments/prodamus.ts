@@ -84,7 +84,7 @@ export function buildProdamusPaymentUrl(
   // Ключи продуктов храним в нотации products[0][name] (как ожидает Продамус),
   // значения кодируем через encodeURIComponent.
   const query = [
-    "do=link",
+    "do=pay",
     `order_id=${encodeURIComponent(String(input.id))}`,
     `customer_email=${encodeURIComponent(String(input.email ?? "").trim())}`,
     `products[0][name]=${encodeURIComponent(productName)}`,
