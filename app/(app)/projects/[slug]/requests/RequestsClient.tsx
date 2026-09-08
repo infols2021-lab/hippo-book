@@ -137,11 +137,6 @@ function formatDateTime(dateString: string | null | undefined) {
   });
 }
 
-function getPaymentQRUrl(seed?: number) {
-  const t = encodeURIComponent(String(seed ?? Date.now()));
-  return `/api/storage/public/help-images/oplata.png?t=${t}`;
-}
-
 async function safeReadJson(res: Response) {
   const text = await res.text();
   let json: any = null;
@@ -359,50 +354,10 @@ export default function RequestsClient({
   const [paymentTotalAmount, setPaymentTotalAmount] = useState(0);
   const [paymentModalItems, setPaymentModalItems] = useState<PaymentDisplayItem[]>([]);
   const [paymentModalSubtitle, setPaymentModalSubtitle] = useState<string>("");
-
-  const [qrSeed, setQrSeed] = useState<number>(() => Date.now());
-  const [qrLoading, setQrLoading] = useState(true);
-  const [qrError, setQrError] = useState(false);
+  const [paymentRequestId, setPaymentRequestId] = useState<string | null>(null);
+  const [paymentBusy, setPaymentBusy] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  const qrUrl = useMemo(() => getPaymentQRUrl(qrSeed), [qrSeed]);
-
-  useEffect(() => {
-    if (!paymentModalOpen) return;
-    let alive = true;
-
-    setQrLoading(true);
-    setQrError(false);
-
-    const img = new window.Image();
-    img.onload = () => {
-      if (alive) {
-        setQrLoading(false);
-        setQrError(false);
-      }
-    };
-    img.onerror = () => {
-      if (alive) {
-        setQrLoading(false);
-        setQrError(true);
-      }
-    };
-    img.src = qrUrl;
-
-    if (img.complete) {
-      if (img.naturalWidth > 0) {
-        setQrLoading(false);
-        setQrError(false);
-      } else {
-        setQrLoading(false);
-        setQrError(true);
-      }
-    }
-
-    return () => {
-      alive = false;
-    };
-  }, [qrUrl, paymentModalOpen]);
 
   useEffect(() => {
     let alive = true;
@@ -590,76 +545,6 @@ export default function RequestsClient({
     return requests.filter((r) => !r.is_processed);
   }, [requests]);
 
-  const aggregatedPendingSummary = useMemo(() => {
-    const itemsMap = new Map<
-      string,
-      {
-        id: string;
-        title: string;
-        count: number;
-        unitPrice: number;
-        tabTitle: string | null;
-        isIssued: boolean;
-      }
-    >();
-
-    for (const req of pendingRequests) {
-      const ids = toStringArray(req.material_ids);
-      for (const id of ids) {
-        const mat = materialMetaById[id];
-        const title = mat?.title || "Учебный материал";
-        const unitPrice = mat?.price ?? 1000;
-        const tabTitle = mat?.tabTitle ?? null;
-        const isIssued = ownedMaterialSet.has(id);
-
-        const current = itemsMap.get(id) ?? {
-          id,
-          title,
-          count: 0,
-          unitPrice,
-          tabTitle,
-          isIssued,
-        };
-        current.count += 1;
-        if (isIssued) current.isIssued = true;
-        itemsMap.set(id, current);
-      }
-    }
-
-    let sum = 0;
-    const items = Array.from(itemsMap.values()).map((item) => {
-      let effectivePrice = 0;
-      let badgeText = "";
-
-      if (item.isIssued) {
-        effectivePrice = 0;
-        badgeText = "уже выдан";
-      } else {
-        effectivePrice = item.unitPrice;
-        if (item.count > 1) {
-          badgeText = `(${item.count} шт.) (уже есть в другой заявке)`;
-        }
-      }
-
-      sum += effectivePrice;
-
-      return {
-        id: item.id,
-        title: item.title,
-        effectivePrice,
-        badgeText,
-        isIssued: item.isIssued,
-        tabTitle: item.tabTitle,
-      };
-    });
-
-    return {
-      totalPrice: sum,
-      items,
-      count: pendingRequests.length,
-    };
-  }, [pendingRequests, materialMetaById, ownedMaterialSet]);
-
   const singleRequestReceipt = useMemo(() => {
     const otherPendingRequests = pendingRequests.filter((r) => r.id !== editingId);
     const otherPendingMaterialIds = new Set<string>();
@@ -711,24 +596,87 @@ export default function RequestsClient({
     setTimeout(() => setNotif(null), 4000);
   }
 
-  function openPaymentModal(
+  function buildPaymentItemsForRequest(r: PurchaseRequest): PaymentDisplayItem[] {
+    const ids = toStringArray(r.material_ids);
+    const items: PaymentDisplayItem[] = [];
+
+    for (const id of ids) {
+      const mat = materialMetaById[id];
+      if (!mat) continue;
+
+      const isIssued = ownedMaterialSet.has(id);
+      items.push({
+        id,
+        title: mat.title || "Учебный материал",
+        effectivePrice: isIssued ? 0 : mat.price,
+        badgeText: isIssued ? "уже выдан" : undefined,
+        isIssued,
+        tabTitle: mat.tabTitle ?? null,
+      });
+    }
+
+    if (items.length === 0) {
+      items.push({
+        id: r.id,
+        title: fallbackRequestMaterialsText(r),
+        effectivePrice: getRequestPrice(r),
+      });
+    }
+
+    return items;
+  }
+
+  function openPayment(
+    requestId: string,
     amount: number,
     displayItems: PaymentDisplayItem[],
     subtitle: string
   ) {
+    setPaymentRequestId(requestId);
     setPaymentTotalAmount(amount);
     setPaymentModalItems(displayItems);
     setPaymentModalSubtitle(subtitle);
-    setQrLoading(true);
-    setQrError(false);
-    setQrSeed(Date.now());
+    setPaymentError(null);
+    setPaymentBusy(false);
     setPaymentModalOpen(true);
   }
 
-  function resetQrStateAndRefresh() {
-    setQrError(false);
-    setQrLoading(true);
-    setQrSeed(Date.now());
+  function payRequest(r: PurchaseRequest) {
+    openPayment(
+      r.id,
+      getRequestPrice(r),
+      buildPaymentItemsForRequest(r),
+      `Материалы в заявке ${r.request_number}:`
+    );
+  }
+
+  async function handleProceedToPayment() {
+    if (!paymentRequestId || paymentBusy) return;
+
+    setPaymentBusy(true);
+    setPaymentError(null);
+
+    try {
+      const res = await fetch("/api/payments/prodamus-link", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ request_id: paymentRequestId }),
+      });
+      const { json } = await safeReadJson(res);
+
+      if (!res.ok || !json?.ok || !json?.url) {
+        throw new Error(json?.error || `HTTP ${res.status}`);
+      }
+
+      // Уходим на платёжную страницу Продамуса (карта / СБП).
+      window.location.assign(String(json.url));
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Не удалось сформировать ссылку на оплату";
+      setPaymentError(message);
+      setPaymentBusy(false);
+    }
   }
 
   async function selectCatalogProject(slug: string) {
@@ -926,10 +874,19 @@ export default function RequestsClient({
       if (!res.ok || !json?.ok) throw new Error(json?.error || `HTTP ${res.status}`);
 
       setRequestModalOpen(false);
-      openPaymentModal(
-        singleRequestReceipt.totalPrice,
+
+      const createdRow = json?.request;
+      const createdId = normalizeString(createdRow?.id) || editingId || "";
+      const createdTotal =
+        typeof createdRow?.total_price === "number"
+          ? createdRow.total_price
+          : singleRequestReceipt.totalPrice;
+
+      openPayment(
+        createdId,
+        createdTotal,
         singleRequestReceipt.items,
-        "Материалы в созданной заявке:"
+        editingId ? "Материалы в заявке:" : "Материалы в созданной заявке:"
       );
       showNotification(editingId ? "Заявка успешно обновлена" : "Заявка успешно создана");
       router.refresh();
@@ -1424,7 +1381,7 @@ export default function RequestsClient({
       >
         <div className="payment-info">
           <h4 style={{ margin: "0 0 10px 0", fontSize: "16px", fontWeight: 800 }}>
-            Инструкция по оплате
+            Состав заказа
           </h4>
 
           {paymentModalItems.length > 0 && (
@@ -1456,112 +1413,60 @@ export default function RequestsClient({
             </div>
           )}
 
-          <ul
+          <div
             style={{
-              margin: 0,
-              paddingLeft: "18px",
-              color: "var(--project-text)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "8px",
-              fontSize: "14px",
-              fontWeight: 600,
+              background: "color-mix(in srgb, var(--project-primary) 7%, transparent)",
+              border: "1px solid color-mix(in srgb, var(--project-primary) 25%, transparent)",
+              borderRadius: 14,
+              padding: "14px 16px",
+              marginBottom: 18,
             }}
           >
-            <li>
-              <strong>Отсканируйте QR-код</strong> в вашем банковском приложении.
-            </li>
-            <li>
+            <div style={{ fontSize: "15px", fontWeight: 800, marginBottom: 6 }}>
               Сумма к оплате:{" "}
-              <strong style={{ fontSize: "17px", color: "var(--project-primary)" }}>
+              <span style={{ fontSize: "19px", color: "var(--project-primary)" }}>
                 {paymentTotalAmount > 0 ? `${paymentTotalAmount} руб.` : "0 руб."}
-              </strong>
-            </li>
-            <li>
-              В назначении платежа (сообщении) <strong>ОБЯЗАТЕЛЬНО</strong> укажите: <br />
-              <span
-                style={{
-                  background: "color-mix(in srgb, var(--project-text) 6%, transparent)",
-                  padding: "6px 10px",
-                  borderRadius: "8px",
-                  display: "inline-block",
-                  marginTop: "6px",
-                  border: "1px solid var(--glass-border)",
-                  fontWeight: 700,
-                }}
-              >
-                ФИО ребенка, оплата за учебные материалы
               </span>
-            </li>
-          </ul>
+            </div>
+            <div style={{ fontSize: 13, lineHeight: 1.5, opacity: 0.85, fontWeight: 600 }}>
+              Оплата проходит через защищённую платёжную страницу — банковской картой или через
+              СБП. После успешной оплаты доступ к материалам откроется автоматически.
+            </div>
+          </div>
         </div>
 
-        <div className="qr-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <div className="qr-title" style={{ fontWeight: 800 }}>QR-код для перевода</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <button
             type="button"
-            className="btn ghost small"
-            onClick={resetQrStateAndRefresh}
-            title="Обновить QR"
-            aria-label="Обновить QR"
-          >
-            Обновить
-          </button>
-        </div>
-
-        <div className="payment-qr" style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 180, background: "#fff", padding: 16, borderRadius: 16, marginBottom: 20, position: "relative" }}>
-          {qrLoading && !qrError && (
-            <div className="qr-loader" role="status" style={{ textAlign: "center", padding: 20 }}>
-              <div className="qr-loader-text" style={{ fontSize: 13, fontWeight: 700, color: "#333" }}>
-                Загружаем QR-код...
-              </div>
-            </div>
-          )}
-
-          {qrError && (
-            <div className="qr-error" role="alert" style={{ textAlign: "center", padding: 20 }}>
-              <div style={{ fontWeight: 800, marginBottom: 6, color: "#d32f2f" }}>
-                Не удалось загрузить QR-код
-              </div>
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={resetQrStateAndRefresh}
-              >
-                Попробовать снова
-              </button>
-            </div>
-          )}
-
-          <img
-            key={qrUrl}
-            src={qrUrl}
-            alt="QR-код для оплаты"
-            className="qr-img"
-            onLoad={() => {
-              setQrLoading(false);
-              setQrError(false);
-            }}
-            onError={() => {
-              setQrLoading(false);
-              setQrError(true);
-            }}
-            style={
-              qrLoading || qrError
-                ? { position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }
-                : { maxWidth: 220, height: "auto", display: "block" }
-            }
-          />
-        </div>
-
-        <div style={{ marginTop: "20px" }}>
-          <button
             className="btn"
-            style={{ width: "100%" }}
+            style={{ width: "100%", padding: "14px 18px", fontSize: 16 }}
+            onClick={() => void handleProceedToPayment()}
+            disabled={paymentBusy || !paymentRequestId}
+          >
+            {paymentBusy ? "Формируем ссылку на оплату..." : "Оплатить картой или СБП"}
+          </button>
+
+          {paymentError && (
+            <div
+              role="alert"
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: "#d32f2f",
+                textAlign: "center",
+              }}
+            >
+              {paymentError}
+            </div>
+          )}
+
+          <button
             type="button"
+            className="btn ghost"
+            style={{ width: "100%" }}
             onClick={() => setPaymentModalOpen(false)}
           >
-            Подтвердить оплату
+            Оплатить позже
           </button>
         </div>
       </Modal>
@@ -1625,9 +1530,9 @@ export default function RequestsClient({
           <div className="payment-info">
             <h4 style={{ margin: "0 0 6px 0", fontSize: 15, fontWeight: 800 }}>Информация об оплате</h4>
             <p style={{ margin: 0, fontSize: 14, fontWeight: 600, lineHeight: 1.5 }}>
-              Выберите нужные материалы в каталоге. QR-код для оплаты появится сразу после создания
-              заявки. После подтверждения оплаты администратором доступ к выбранным материалам
-              будет открыт автоматически.
+              Выберите нужные материалы в каталоге. После создания заявки появится кнопка оплаты
+              картой или через СБП. Доступ к материалам откроется автоматически сразу после
+              успешной оплаты.
             </p>
           </div>
 
@@ -1640,23 +1545,6 @@ export default function RequestsClient({
               disabled={busy}
             >
               + Создать новую заявку
-            </button>
-            <button
-              className="btn ghost"
-              type="button"
-              onClick={() => {
-                if (aggregatedPendingSummary.count === 0) {
-                  showNotification("У вас нет ожидающих оплаты заявок.", "info");
-                  return;
-                }
-                openPaymentModal(
-                  aggregatedPendingSummary.totalPrice,
-                  aggregatedPendingSummary.items,
-                  `Заказываемые материалы из неоплаченных заявок (${aggregatedPendingSummary.count}):`
-                );
-              }}
-            >
-              Оплатить заявку (QR)
             </button>
           </div>
 
@@ -1714,7 +1602,15 @@ export default function RequestsClient({
                             {locked ? (
                               <span className="actions-locked">Недоступно</span>
                             ) : (
-                              <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                              <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", flexWrap: "wrap" }}>
+                                <button
+                                  className="btn btn-small"
+                                  onClick={() => void payRequest(r)}
+                                  type="button"
+                                  disabled={busy}
+                                >
+                                  Оплатить
+                                </button>
                                 <button
                                   className="btn btn-small"
                                   onClick={() => void openEdit(r)}
@@ -1772,6 +1668,14 @@ export default function RequestsClient({
                             <span className="actions-locked">Заявка закрыта</span>
                           ) : (
                             <>
+                              <button
+                                className="btn btn-small"
+                                onClick={() => void payRequest(r)}
+                                type="button"
+                                disabled={busy}
+                              >
+                                Оплатить
+                              </button>
                               <button
                                 className="btn btn-small"
                                 onClick={() => void openEdit(r)}

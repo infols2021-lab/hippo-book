@@ -47,6 +47,14 @@ export type ProdamusWebhookPayload = {
   [key: string]: unknown;
 };
 
+/** Опциональные параметры ссылки на оплату. */
+export type ProdamusPaymentLinkOptions = {
+  /** URL, куда Продамус вернёт покупателя после успешной оплаты (urlSuccess). */
+  successUrl?: string | null;
+  /** URL, куда Продамус вернёт покупателя при отмене/ошибке оплаты (urlReturn). */
+  returnUrl?: string | null;
+};
+
 // ----------------------------------------------------------------------------
 // Генератор ссылки на оплату
 // ----------------------------------------------------------------------------
@@ -57,7 +65,10 @@ export type ProdamusWebhookPayload = {
  * Базовый URL берётся из PRODAMUS_STORE_URL. Названия материалов склеиваются
  * в единую позицию products[0][name], а total_price уходит в products[0][price].
  */
-export function buildProdamusPaymentUrl(input: ProdamusPaymentLinkInput): string {
+export function buildProdamusPaymentUrl(
+  input: ProdamusPaymentLinkInput,
+  options?: ProdamusPaymentLinkOptions,
+): string {
   const base = mustEnv("PRODAMUS_STORE_URL").trim().replace(/\/+$/, "");
 
   if (!input?.id) {
@@ -79,9 +90,17 @@ export function buildProdamusPaymentUrl(input: ProdamusPaymentLinkInput): string
     `products[0][name]=${encodeURIComponent(productName)}`,
     `products[0][price]=${encodeURIComponent(String(price))}`,
     "products[0][quantity]=1",
-  ].join("&");
+  ];
 
-  return `${base}/?${query}`;
+  if (options?.successUrl) {
+    query.push(`urlSuccess=${encodeURIComponent(options.successUrl)}`);
+  }
+
+  if (options?.returnUrl) {
+    query.push(`urlReturn=${encodeURIComponent(options.returnUrl)}`);
+  }
+
+  return `${base}/?${query.join("&")}`;
 }
 
 // ----------------------------------------------------------------------------
