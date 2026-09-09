@@ -9,11 +9,14 @@ export const revalidate = 0;
 
 export default async function ProjectProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ payment?: string }>;
 }) {
   const supabase = await createSupabaseServerClient();
   const { slug } = await params;
+  const { payment } = await searchParams;
 
   // 1. Проверяем авторизацию
   const {
@@ -79,6 +82,7 @@ export default async function ProjectProfilePage({
         userId={user.id}
         userEmail={user.email || ""}
         initialProfile={initialProfile}
+        paymentSuccess={payment === "success"}
         backgroundUrl={backgroundUrl}
       />
     </>

@@ -88,6 +88,7 @@ type Props = {
   userEmail: string;
   initialProfile: ProfileData;
   backgroundUrl: string | null;
+  paymentSuccess?: boolean;
   stats?: Stats | null;
   materialsProgress?: MaterialProgressItem[] | null;
   streak?: StreakData | null;
@@ -157,6 +158,7 @@ export default function ProfileClient({
   userEmail,
   initialProfile,
   backgroundUrl,
+  paymentSuccess = false,
   stats: statsProp,
   materialsProgress: progressProp,
   streak: streakProp,
@@ -173,6 +175,7 @@ export default function ProfileClient({
   const [bgLoading, setBgLoading] = useState<boolean>(Boolean(backgroundProxyUrl));
   const [bgReady, setBgReady] = useState<boolean>(false);
   const [notif, setNotif] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [paymentSuccessOpen, setPaymentSuccessOpen] = useState(false);
 
   const [editOpen, setEditOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false); // Модалка поддержки для мобилок
@@ -271,6 +274,16 @@ export default function ProfileClient({
     setNotif({ type, text });
     setTimeout(() => setNotif(null), 3500);
   }
+
+  // Уведомление об успешной оплате после редиректа с Продамуса (?payment=success).
+  useEffect(() => {
+    if (!paymentSuccess) return;
+    setPaymentSuccessOpen(true);
+    // Чистим query-параметр, чтобы модалка не всплывала при обновлении страницы.
+    if (typeof window !== "undefined" && window.history?.replaceState) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [paymentSuccess]);
 
   const fetchStreakData = async () => {
     try {
@@ -579,6 +592,82 @@ export default function ProfileClient({
           {notif.text}
         </div>
       )}
+
+      {/* Успешная оплата — редирект с Продамуса через ?payment=success */}
+      <Modal
+        open={paymentSuccessOpen}
+        onClose={() => setPaymentSuccessOpen(false)}
+        title="Оплата прошла успешно 🎉"
+        maxWidth={480}
+      >
+        <div style={{ textAlign: "center", padding: "8px 4px 4px" }}>
+          <div
+            style={{
+              width: 72,
+              height: 72,
+              margin: "0 auto 18px",
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "linear-gradient(135deg, #34d399 0%, #10b981 100%)",
+              boxShadow: "0 12px 28px rgba(16,185,129,0.35)",
+            }}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ width: 36, height: 36, color: "#ffffff" }}
+              aria-hidden="true"
+            >
+              <path d="M20 6L9 17l-5-5" />
+            </svg>
+          </div>
+          <p style={{ margin: "0 0 6px", fontWeight: 800, fontSize: 16 }}>
+            Доступ к материалам открыт!
+          </p>
+          <p
+            style={{
+              margin: "0 auto 22px",
+              maxWidth: 360,
+              fontSize: 13.5,
+              lineHeight: 1.55,
+              opacity: 0.85,
+              fontWeight: 500,
+            }}
+          >
+            Платёж подтверждён — права на выбранные материалы уже выданы. Приятного
+            обучения!
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <Link
+              href={`/projects/${projectSlug}/materials`}
+              className="btn"
+              style={{
+                width: "100%",
+                padding: "13px 18px",
+                fontSize: 15,
+                textAlign: "center",
+                textDecoration: "none",
+              }}
+            >
+              Перейти к материалам
+            </Link>
+            <button
+              type="button"
+              className="btn ghost"
+              style={{ width: "100%" }}
+              onClick={() => setPaymentSuccessOpen(false)}
+            >
+              Остаться в профиле
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Редактирование профиля" maxWidth={520}>
         <form

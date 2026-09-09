@@ -350,6 +350,106 @@ export async function deleteRequestRowByNumber(requestNumber: string, customTabN
 }
 
 // ----------------------------------------------------------------------------
+// Точечное обновление ячеек листа «Учёт» после оплаты (статус + колонка H)
+// ----------------------------------------------------------------------------
+
+const ACCOUNTING_STATUS_COLUMN = "G";
+const ACCOUNTING_PAYMENT_COLUMN = "H";
+
+/**
+ * Обновляет одну ячейку строки на листе «Учёт».
+ * @returns { updatedRange, rowNumber }
+ */
+async function updateAccountingCellValue(
+  rowNumber: number,
+  column: string,
+  value: string | number,
+  customTabName?: string | null,
+) {
+  if (!Number.isFinite(rowNumber) || rowNumber <= 0) {
+    throw new Error(`Invalid row number: ${rowNumber}`);
+  }
+
+  const sheets = getSheetsClient();
+  const { spreadsheetId, tab } = getSpreadsheetConfig(customTabName);
+
+  const res = await sheets.spreadsheets.values.update(
+    {
+      spreadsheetId,
+      range: range(tab, `${column}${rowNumber}`),
+      valueInputOption: "USER_ENTERED",
+      requestBody: {
+        values: [[value]],
+      },
+    },
+    {
+      timeout: GOOGLE_API_TIMEOUT_MS,
+    },
+  );
+
+  return {
+    updatedRange: res.data.updatedRange ?? null,
+    rowNumber,
+  };
+}
+
+/**
+ * Меняет статус заявки в колонке G листа «Учёт» (например «⏳ Ожидает» →
+ * «✅ Оплачено» после подтверждения оплаты из вебхука Продамуса).
+ *
+ * @param rowNumber 1-based номер строки в таблице (поле purchase_requests.sheet_row)
+ * @param status Новое значение статуса («✅ Оплачено», «Одобрено» и т.п.)
+ */
+export async function updateGoogleSheetRequestStatus(
+  rowNumber: number,
+  status: string,
+  customTabName?: string | null,
+) {
+  const cleanStatus = String(status ?? "").trim();
+  if (!cleanStatus) {
+    return { updatedRange: null as string | null, rowNumber };
+  }
+
+  return updateAccountingCellValue(
+    rowNumber,
+    ACCOUNTING_STATUS_COLUMN,
+    cleanStatus,
+    customTabName,
+  );
+}
+
+/**
+ * Записывает в колонку H листа «Учёт» итоговую сумму платежа с детализацией
+ * комиссии Продамуса. Колонка H — 8-я по счёту.
+ *
+ * @param rowNumber 1-based номер строки в таблице
+ * @param paymentValue Строка вида
+ *   "50 ₽ (комиссия 0.6 ₽, к выплате 49.40 ₽)" — для наглядного учёта,
+ *   либо число (сумма к получению) — если колонка H в таблице числовая.
+ */
+export async function updateAccountingPaymentColumn(
+  rowNumber: number,
+  paymentValue: string | number,
+  customTabName?: string | null,
+) {
+  const cleanValue =
+    typeof paymentValue === "number" && Number.isFinite(paymentValue)
+      ? paymentValue
+      : String(paymentValue ?? "").trim();
+
+  if (cleanValue === "") {
+    return { updatedRange: null as string | null, rowNumber };
+  }
+
+  return updateAccountingCellValue(
+    rowNumber,
+    ACCOUNTING_PAYMENT_COLUMN,
+    cleanValue,
+    customTabName,
+  );
+}
+
+// ----------------------------------------------------------------------------
 // Prodamus: успешные оплаты на отдельном листе
 // ----------------------------------------------------------------------------
 

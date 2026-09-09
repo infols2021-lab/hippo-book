@@ -11,7 +11,12 @@ import {
 } from "@/lib/payments/prodamus";
 import { grantAccessForRequest } from "@/lib/requests/grants";
 import { toStringArray } from "@/lib/materials/normalize";
-import { logProdamusPayment } from "@/lib/integrations/googleSheets";
+import {
+  findRowNumberByRequestNumber,
+  logProdamusPayment,
+  updateAccountingPaymentColumn,
+  updateGoogleSheetRequestStatus,
+} from "@/lib/integrations/googleSheets";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +37,7 @@ type RequestRow = {
   material_ids?: unknown;
   total_price?: number | null;
   project_id?: string | null;
+  sheet_row?: number | null;
   is_processed?: boolean | null;
 };
 
@@ -268,6 +274,102 @@ async function syncProdamusSheet(supabase: SupabaseClient, requestRow: RequestRo
   }
 }
 
+/** Данные платежа из вебхука Продамуса для листа «Учёт». */
+type AccountingPaymentInfo = {
+  sum?: unknown;
+  commissionSum?: unknown;
+  commissionPercent?: unknown;
+};
+
+/**
+ * Имя листа «Учёт» для проекта заявки (projects.sheet_name).
+ * null → googleSheets возьмёт дефолт (GOOGLE_SHEETS_TAB / «Учёт»).
+ */
+async function findAccountingSheetName(
+  supabase: SupabaseClient,
+  requestRow: RequestRow,
+): Promise<string | null> {
+  if (!requestRow.project_id) return null;
+
+  const { data } = await supabase
+    .from("projects")
+    .select("sheet_name")
+    .eq("id", requestRow.project_id)
+    .maybeSingle();
+
+  const sheetName = data?.sheet_name;
+  return typeof sheetName === "string" && sheetName.trim() ? sheetName.trim() : null;
+}
+
+/**
+ * Обновляет лист «Учёт» после успешной оплаты (best-effort, НЕ роняет выдачу):
+ *   1. статус строки (колонка G): «⏳ Ожидает» → «✅ Оплачено»;
+ *   2. колонка H: сумма платежа с детализацией комиссии.
+ *
+ * Строка ищется по purchase_requests.sheet_row, иначе — по request_number.
+ * Сырой аудит-лог на листе «prodamus» здесь не трогается (см. syncProdamusSheet).
+ */
+async function syncAccountingSheet(
+  supabase: SupabaseClient,
+  requestRow: RequestRow,
+  payment: AccountingPaymentInfo,
+) {
+  try {
+    const sheetName = await findAccountingSheetName(supabase, requestRow);
+
+    // Номер строки в таблице: из БД, либо находим по request_number.
+    const storedRow = Number(requestRow.sheet_row);
+    let rowNumber = Number.isFinite(storedRow) && storedRow > 0 ? storedRow : null;
+
+    if (!rowNumber) {
+      rowNumber = await findRowNumberByRequestNumber(
+        requestRow.request_number || "",
+        sheetName,
+      );
+    }
+
+    if (!rowNumber) {
+      console.log(
+        "[ProdamusWebhook] Строка в «Учёт» не найдена, пропускаем синк. request_id=",
+        requestRow.id,
+      );
+      return;
+    }
+
+    // 1. Статус строки на листе «Учёт».
+    await updateGoogleSheetRequestStatus(rowNumber, "✅ Оплачено", sheetName);
+
+    // 2. Сумма и комиссия в колонку H (8-я колонка):
+    //    чистая сумма к выплате = sum - commission_sum.
+    const sum = Number(payment.sum ?? 0);
+    const commissionSum = Number(payment.commissionSum ?? 0);
+    const payout = Number((sum - commissionSum).toFixed(2));
+    const paymentLabel =
+      `${sum.toFixed(2)} ₽ (комиссия ${commissionSum.toFixed(2)} ₽, ` +
+      `к выплате ${payout.toFixed(2)} ₽)`;
+
+    await updateAccountingPaymentColumn(rowNumber, paymentLabel, sheetName);
+
+    console.log(
+      "[ProdamusWebhook] «Учёт» обновлён: row=",
+      rowNumber,
+      "sheet=",
+      sheetName ?? "(default)",
+      "payout=",
+      payout.toFixed(2),
+      "request_id=",
+      requestRow.id,
+    );
+  } catch (error) {
+    console.error(
+      "[ProdamusWebhook] Ошибка синка «Учёт»:",
+      errorMessage(error),
+      "request_id=",
+      requestRow.id,
+    );
+  }
+}
+
 export async function POST(req: NextRequest) {
   const startedAt = Date.now();
   const method = req.method;
@@ -484,8 +586,15 @@ export async function POST(req: NextRequest) {
     return new Response("Internal Server Error", { status: 500 });
   }
 
-  // 10. Google Sheets (отдельный лист) — не роняет выдачу.
+  // 10a. Google Sheets: аудит-лог успешной оплаты на отдельном листе «prodamus».
   await syncProdamusSheet(supabase, requestRow);
+
+  // 10b. Google Sheets «Учёт»: статус заявки (G) + сумма и комиссия (H).
+  await syncAccountingSheet(supabase, requestRow, {
+    sum: body?.sum,
+    commissionSum: body?.commission_sum,
+    commissionPercent: body?.commission,
+  });
 
   console.log("[ProdamusWebhook] Заявка обработана автоматически. id=", requestRow.id);
   return new Response("OK", { status: 200 });

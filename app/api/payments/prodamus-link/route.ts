@@ -31,6 +31,13 @@ async function safeJson(req: NextRequest) {
  *
  * order_id = id заявки (purchase_requests.id). Ссылка строится только для
  * необработанных заявок текущего пользователя.
+ *
+ * Тело запроса (опционально):
+ * - request_id (uuid) — обязательный id заявки;
+ * - project_slug / projectSlug — slug ветки (проекта), в профиль которой
+ *   вернём покупателя после успешной оплаты;
+ * - return_url / returnUrl — относительный путь, куда вернуть при отмене
+ *   (иначе формируется из project_slug или используется /portal).
  */
 export async function POST(req: NextRequest) {
   try {
@@ -122,6 +129,20 @@ export async function POST(req: NextRequest) {
     // Продамусу отдаём request_number как order_id — вебхук ищет заявку по нему.
     const orderId = normalizeString(requestRow.request_number) || requestRow.id;
 
+    // Динамический редирект: после успешной оплаты возвращаем пользователя в
+    // профиль именно того проекта (ветки), откуда он инициировал оплату.
+    // Если projectSlug неизвестен — безопасный фоллбек на /portal.
+    const projectSlug = normalizeString(body?.project_slug ?? body?.projectSlug);
+    const rawReturnUrl = normalizeString(body?.return_url ?? body?.returnUrl);
+    // Принимаем только относительные пути: urlReturn попадает в открытую ссылку
+    // Продамуса и не должен вести на сторонний origin.
+    const returnUrl = rawReturnUrl.startsWith("/") ? rawReturnUrl : "";
+
+    const successPath = projectSlug
+      ? `/projects/${projectSlug}/profile?payment=success&order_num=${orderId}`
+      : `/portal?payment=success&order_num=${orderId}`;
+    const returnPath = returnUrl || (projectSlug ? `/projects/${projectSlug}/requests` : "/portal");
+
     const url = buildProdamusPaymentUrl(
       {
         id: orderId,
@@ -130,8 +151,8 @@ export async function POST(req: NextRequest) {
         materialNames,
       },
       {
-        successUrl: `${origin}/payment/success`,
-        returnUrl: `${origin}/payment/fail`,
+        successUrl: `${origin}${successPath}`,
+        returnUrl: `${origin}${returnPath}`,
       }
     );
 
