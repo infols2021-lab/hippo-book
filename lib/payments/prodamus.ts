@@ -108,47 +108,102 @@ export function buildProdamusPaymentUrl(
 // ----------------------------------------------------------------------------
 
 /**
- * Каноническая строка для подписи по правилам Продамуса.
+ * Превращает плоские ключи form-urlencoded вида "products[0][name]" во
+ * вложенный объект/массив — как PHP сам разберёт их в $_POST:
  *
- * ВАЖНО: Продамус НЕ подписывает сырое тело запроса. Он сортирует ключи
- * рекурсивно (в т.ч. внутри вложенных массивов/объектов), склеивает их в
- * строку `key=value`, затем считает HMAC-SHA256(hex) от полученной строки.
+ *   products[0][name]=тест&products[0][price]=100
+ *     → { products: [ { name: "тест", price: "100" } ] }
+ *
+ * Именно такое вложенное представление использует официальная библиотека
+ * Продамуса Hmac.php при формировании подписи.
+ */
+export function unflattenBody(data: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+
+  for (const rawKey of Object.keys(data ?? {})) {
+    const val = data[rawKey];
+    // Регулярка разбивает ключ вида products[0][name] на ['products', '0', 'name']
+    const parts = rawKey.replace(/\]/g, "").split(/\[/);
+
+    let current: Record<string, unknown> = result;
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const isLast = i === parts.length - 1;
+
+      if (isLast) {
+        current[part] = val;
+      } else {
+        const nextPart = parts[i + 1];
+        const isNextIndex = /^\d+$/.test(nextPart);
+
+        const existing = current[part];
+        const isContainer = existing !== null && typeof existing === "object";
+
+        if (!isContainer) {
+          const created: unknown[] | Record<string, unknown> = isNextIndex ? [] : {};
+          current[part] = created;
+          current = created as unknown as Record<string, unknown>;
+        } else {
+          current = existing as Record<string, unknown>;
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Рекурсивная сортировка ключей объекта по алфавиту (аналог ksort в PHP).
+ * Массивы сортируются поэлементно (порядок индексов сохраняется).
+ */
+export function sortObject(obj: unknown): unknown {
+  if (obj === null || typeof obj !== "object") return obj;
+  if (Array.isArray(obj)) return obj.map((item) => sortObject(item));
+
+  const record = obj as Record<string, unknown>;
+  const sorted: Record<string, unknown> = {};
+
+  for (const key of Object.keys(record).sort()) {
+    sorted[key] = sortObject(record[key]);
+  }
+
+  return sorted;
+}
+
+/**
+ * Строка для подписи по правилам официальной библиотеки Продамуса Hmac.php:
+ *
+ *   1. вырезаем sign/Sign из тела;
+ *   2. разворачиваем плоские ключи products[0][name] во вложенные (unflattenBody);
+ *   3. рекурсивно сортируем ключи (sortObject, аналог ksort);
+ *   4. сериализуем в компактный JSON.
+ *
+ * Дефолтный JSON.stringify в JS не экранирует ни юникод, ни слэши и не
+ * добавляет пробелы — это ровно соответствует PHP json_encode с флагами
+ * JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES.
  *
  * Строка вынесена отдельно, чтобы вебхук мог залогировать её при расхождении
- * подписей (сгенерированная vs полученная) — это резко ускоряет диагностику.
+ * подписей (сгенерированная vs полученная).
  *
  * @param bodyObj Распарсенное тело вебхука (json → объект, form → плоский объект)
  */
-export function buildProdamusSignatureString(
+export function buildProdamusSignatureJson(
   bodyObj: Record<string, unknown> | null | undefined,
 ): string {
   if (!bodyObj || typeof bodyObj !== "object") {
     return "";
   }
 
-  // Рекурсивный алгоритм сортировки и склейки по правилам Продамуса
-  const encode = (data: unknown): string => {
-    if (Array.isArray(data)) {
-      return data.map(encode).join(";");
-    }
+  // Вырезаем поле подписи, если оно вдруг прилетело вместе с данными
+  const cleanData: Record<string, unknown> = { ...bodyObj };
+  delete cleanData.sign;
+  delete cleanData.Sign;
 
-    if (data !== null && typeof data === "object") {
-      const record = data as Record<string, unknown>;
-      return Object.keys(record)
-        .sort()
-        .map((key) => `${key}=${encode(record[key])}`)
-        .join("&");
-    }
+  const unflattened = unflattenBody(cleanData);
+  const sorted = sortObject(unflattened);
 
-    return String(data);
-  };
-
-  // Убираем поле подписи из тела, если оно вдруг прилетело вместе с данными
-  const dataToSign: Record<string, unknown> = { ...bodyObj };
-  delete dataToSign.sign;
-  delete dataToSign.Sign;
-
-  return encode(dataToSign);
+  return JSON.stringify(sorted);
 }
 
 /**
@@ -170,12 +225,12 @@ export function computeProdamusSignature(
     return "";
   }
 
-  const encodedStr = buildProdamusSignatureString(bodyObj);
-  if (!encodedStr) {
+  const jsonString = buildProdamusSignatureJson(bodyObj);
+  if (!jsonString) {
     return "";
   }
 
-  return createHmac("sha256", secret).update(encodedStr).digest("hex").toLowerCase();
+  return createHmac("sha256", secret).update(jsonString).digest("hex").toLowerCase();
 }
 
 /**

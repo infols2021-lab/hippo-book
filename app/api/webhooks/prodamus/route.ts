@@ -5,7 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isValidUUID } from "@/lib/api/validate";
 import {
-  buildProdamusSignatureString,
+  buildProdamusSignatureJson,
   computeProdamusSignature,
   verifyProdamusSignature,
 } from "@/lib/payments/prodamus";
@@ -385,7 +385,7 @@ export async function POST(req: NextRequest) {
   if (!valid) {
     console.error(
       "[ProdamusWebhook][SIGN-FAIL] Подпись НЕ совпала.\n" +
-        "  canonicalString = " + buildProdamusSignatureString(body) + "\n" +
+        "  jsonString     = " + buildProdamusSignatureJson(body) + "\n" +
         "  computed (ours) = " + expectedSign + "\n" +
         "  received (Sign) = " + receivedSign,
     );
