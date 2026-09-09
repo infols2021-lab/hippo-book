@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback, useId } from "react";
 import type { QuestionMatching, MatchingPair } from "@/lib/assignments/types";
 import MediaRenderer from "./MediaRenderer";
-import { getImageUrl } from "@/lib/assignments/image";
+import MediaImage from "./MediaImage";
 
 type Props = {
   question: QuestionMatching;
@@ -25,18 +25,7 @@ function SmallMedia({ media }: { media?: any[] }) {
   return (
     <div style={{ display: "flex", justifyContent: "flex-start", marginTop: "4px" }}>
       {isImg ? (
-        <img
-          src={getImageUrl(m.url)}
-          alt="Медиавариант"
-          decoding="async"
-          loading="eager"
-          style={{
-            maxWidth: "120px",
-            maxHeight: "120px",
-            objectFit: "contain",
-            borderRadius: "8px",
-          }}
-        />
+        <MediaImage src={m.url} alt="Медиавариант" boxWidth={120} boxHeight={120} radius={8} />
       ) : (
         <div style={{ maxWidth: "120px", maxHeight: "120px", overflow: "hidden" }}>
           <MediaRenderer media={media} />

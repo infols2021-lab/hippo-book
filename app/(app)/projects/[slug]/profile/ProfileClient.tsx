@@ -15,6 +15,7 @@ import {
 } from "@/lib/tour/tourMobile";
 import { saveTourProgress, clearTourProgress } from "@/lib/tour/tourPersistence";
 import ProjectHeader from "@/components/projects/ProjectHeader";
+import { notifyNewGrantForDirection } from "@/components/projects/GrantedAccessModal";
 
 import "./profile.css";
 
@@ -149,6 +150,96 @@ function normalizeUiErrorMessage(error: unknown, fallback = "Произошла 
   return msg;
 }
 
+// ─────────────────────────────────────────────────────────────
+// Состав материалов, выданных после успешной оплаты
+// ─────────────────────────────────────────────────────────────
+
+type PaymentGrantMaterial = {
+  id: string;
+  title: string;
+  kind?: string;
+};
+
+function grantKindLabel(kind: string): string {
+  switch (String(kind || "").toLowerCase()) {
+    case "textbook":
+      return "Учебник";
+    case "crossword":
+      return "Кроссворд";
+    case "mock_test":
+      return "Пробный тест";
+    case "material":
+      return "Материал";
+    default:
+      return kind || "Материал";
+  }
+}
+
+const PAYMENT_GRANT_ATTEMPTS = 6;
+const PAYMENT_GRANT_RETRY_DELAY_MS = 1500;
+
+// Запрашивает состав выданных материалов по order_num. Вебхук Продамуса может
+// начислять гранты с задержкой после редиректа пользователя, поэтому делаем
+// несколько попыток с паузами.
+async function fetchPaidGrantedMaterials(
+  projectSlug: string,
+  orderNum: string
+): Promise<{ requestId: string | null; materials: PaymentGrantMaterial[] }> {
+  if (!orderNum) return { requestId: null, materials: [] };
+
+  for (let attempt = 0; attempt < PAYMENT_GRANT_ATTEMPTS; attempt++) {
+    try {
+      const qs = new URLSearchParams({ order_num: orderNum, project_slug: projectSlug });
+      const res = await fetch(`/api/requests/grants?${qs.toString()}`, { cache: "no-store" });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.ok) {
+        const materials = Array.isArray(json.materials) ? json.materials : [];
+        if (materials.length > 0) {
+          return { requestId: json.requestId ?? null, materials };
+        }
+      }
+    } catch {
+      // повторим попытку ниже
+    }
+
+    if (attempt < PAYMENT_GRANT_ATTEMPTS - 1) {
+      await new Promise<void>((resolve) => setTimeout(resolve, PAYMENT_GRANT_RETRY_DELAY_MS));
+    }
+  }
+
+  return { requestId: null, materials: [] };
+}
+
+// Помечает прочитанными уведомления о выданных материалах этой заявки, чтобы
+// системная модалка GrantedAccessModal не дублировала список после того, как
+// пользователь увидел его в модалке оплаты.
+async function markPaymentGrantNotificationsRead(projectSlug: string, requestId: string | null) {
+  if (!requestId) return;
+  try {
+    const res = await fetch(
+      `/api/notifications/unread?project=${encodeURIComponent(projectSlug)}`,
+      { cache: "no-store" }
+    );
+    const json = await res.json().catch(() => null);
+    const notifications = Array.isArray(json?.notifications) ? json.notifications : [];
+    const toMark = notifications.filter(
+      (n: { request_id?: string; read_at?: string | null }) =>
+        n.request_id === requestId && !n.read_at
+    );
+    await Promise.all(
+      toMark.map((n: { id: string }) =>
+        fetch("/api/notifications/read", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: n.id }),
+        }).catch(() => {})
+      )
+    );
+  } catch {
+    // уведомления останутся непрочитанными — GrantedAccessModal покажет их позже
+  }
+}
+
 export default function ProfileClient({
   projectName,
   projectSlug,
@@ -177,6 +268,11 @@ export default function ProfileClient({
   const [bgReady, setBgReady] = useState<boolean>(false);
   const [notif, setNotif] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [paymentSuccessOpen, setPaymentSuccessOpen] = useState(false);
+  // Список материалов, выданных по только что оплаченной заявке (null = грузим).
+  const [grantedMaterials, setGrantedMaterials] = useState<PaymentGrantMaterial[] | null>(null);
+  // После закрытия модалки оплаты перепроверяем доступы (GrantedAccessModal),
+  // чтобы любые оставшиеся уведомления о новых материалах показались сразу.
+  const paymentGrantRecheckRef = useRef(false);
 
   const [editOpen, setEditOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false); // Модалка поддержки для мобилок
@@ -296,26 +392,65 @@ export default function ProfileClient({
     }
   }, [projectSlug]);
 
-  // Возврат после успешной оплаты (?payment=success): чистим адрес, сбрасываем
-  // кэш Next.js и клиентские данные (чтобы материалы сразу стали доступны),
-  // затем показываем модалку. Пользователь остаётся в профиле.
+  // Возврат после успешной оплаты (?payment=success): мгновенно показываем
+  // модалку со списком выданных материалов, сбрасываем серверный кэш и данные
+  // (чтобы материалы сразу стали доступны). Query-параметр чистим уже ПОСЛЕ
+  // того, как модалка встала в стейт на показ, — тогда при F5 она не откроется
+  // повторно.
   useEffect(() => {
     if (paymentHandled.current) return;
     if (searchParams.get("payment") !== "success") return;
     paymentHandled.current = true;
 
-    // 1. Сразу чистим query-параметр, чтобы модалка не сработала при обновлении.
-    if (typeof window !== "undefined" && window.history?.replaceState) {
-      window.history.replaceState({}, "", window.location.pathname);
-    }
+    const orderNum = (searchParams.get("order_num") || "").trim();
 
-    // 2. Принудительно сбрасываем серверный кэш и обновляем данные клиента.
+    // 1. Мгновенно открываем модалку — без ожидания сетевых запросов.
+    setPaymentSuccessOpen(true);
+
+    // 2. Принудительно сбрасываем серверный кэш и обновляем клиентские данные.
     router.refresh();
     void reloadProgress();
 
-    // 3. Модалка успешной оплаты.
-    setPaymentSuccessOpen(true);
-  }, [searchParams, router, reloadProgress]);
+    // 3. Ревалидейт выдачи: запрашиваем актуальный состав открытых материалов
+    //    по order_num. Вебхук Продамуса может начислять гранты с задержкой
+    //    после редиректа, поэтому делаем несколько попыток с паузами.
+    let cancelled = false;
+
+    (async () => {
+      const { requestId, materials } = await fetchPaidGrantedMaterials(projectSlug, orderNum);
+      if (cancelled) return;
+
+      setGrantedMaterials(materials);
+
+      // 4. Очищаем query-параметр ПОСЛЕ того, как модалка в стейте и список
+      //    материалов получен (F5 больше не откроет модалку повторно).
+      if (typeof window !== "undefined" && window.history?.replaceState) {
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+
+      // 5. Гасим одноимённые уведомления, чтобы системная модалка
+      //    GrantedAccessModal не дублировала список после закрытия текущей.
+      await markPaymentGrantNotificationsRead(projectSlug, requestId);
+
+      // 6. После закрытия модалки перепроверяем доступы (GrantedAccessModal),
+      //    чтобы любые оставшиеся уведомления о новых материалах показались.
+      if (materials.length > 0) paymentGrantRecheckRef.current = true;
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, router, reloadProgress, projectSlug]);
+
+  // Закрытие модалки успешной оплаты. После закрытия перепроверяем доступы:
+  // если остались другие недавно выданные материалы — они покажутся сразу.
+  const closePaymentSuccess = useCallback(() => {
+    setPaymentSuccessOpen(false);
+    if (paymentGrantRecheckRef.current) {
+      paymentGrantRecheckRef.current = false;
+      notifyNewGrantForDirection();
+    }
+  }, []);
 
   const fetchStreakData = async () => {
     try {
@@ -610,57 +745,173 @@ export default function ProfileClient({
       {/* Модалка успешной оплаты — редирект с Продамуса через ?payment=success */}
       <Modal
         open={paymentSuccessOpen}
-        onClose={() => setPaymentSuccessOpen(false)}
+        onClose={closePaymentSuccess}
         title="Оплата успешно завершена"
-        maxWidth={440}
+        maxWidth={460}
       >
-        <div style={{ textAlign: "center", padding: "6px 4px 2px" }}>
+        <div style={{ padding: "4px 4px 2px" }}>
           <div
             style={{
-              width: 64,
-              height: 64,
-              margin: "0 auto 18px",
-              borderRadius: "50%",
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: "#f1f5f9",
+              gap: 12,
+              padding: "14px 16px",
+              borderRadius: 14,
+              background: "#f8fafc",
               border: "1px solid #e2e8f0",
+              marginBottom: 16,
             }}
           >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ width: 30, height: 30, color: "#0f172a" }}
-              aria-hidden="true"
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: "50%",
+                background: "#f1f5f9",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
             >
-              <path d="M20 6L9 17l-5-5" />
-            </svg>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#0f172a"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ width: 20, height: 20 }}
+                aria-hidden="true"
+              >
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: "#0f172a", lineHeight: 1.35 }}>
+              Вам предоставлен доступ к следующим материалам:
+            </div>
           </div>
-          <p style={{ margin: "0 0 8px", fontWeight: 800, fontSize: 16 }}>
-            Доступ к материалам предоставлен
-          </p>
-          <p
-            style={{
-              margin: "0 auto 24px",
-              maxWidth: 340,
-              fontSize: 13.5,
-              lineHeight: 1.55,
-              color: "#64748b",
-              fontWeight: 500,
-            }}
-          >
-            Вы можете приступить к обучению в любое удобное время.
-          </p>
+
+          {grantedMaterials === null ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                color: "#64748b",
+                fontWeight: 600,
+                fontSize: 14,
+                padding: "6px 4px 18px",
+              }}
+            >
+              <span className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} />
+              Проверяем список выданных материалов...
+            </div>
+          ) : grantedMaterials.length === 0 ? (
+            <p
+              style={{
+                margin: "0 auto 22px",
+                maxWidth: 360,
+                fontSize: 13.5,
+                lineHeight: 1.55,
+                color: "#64748b",
+                fontWeight: 500,
+                textAlign: "center",
+              }}
+            >
+              Материалы уже доступны в вашем профиле. Вы можете приступить к обучению в любое
+              удобное время.
+            </p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+              {grantedMaterials.map((m, index) => (
+                <div
+                  key={`${m.id || "grant"}-${index}`}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "12px 14px",
+                    borderRadius: 12,
+                    border: "1px solid #e2e8f0",
+                    background: "#ffffff",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 10,
+                      background: "#f1f5f9",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#475569"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{ width: 17, height: 17 }}
+                      aria-hidden="true"
+                    >
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                    </svg>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontWeight: 700,
+                        fontSize: 14,
+                        color: "#0f172a",
+                        lineHeight: 1.35,
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {m.title}
+                    </div>
+                    {m.kind && (
+                      <div
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          letterSpacing: "0.4px",
+                          textTransform: "uppercase",
+                          color: "#94a3b8",
+                          marginTop: 2,
+                        }}
+                      >
+                        {grantKindLabel(m.kind)}
+                      </div>
+                    )}
+                  </div>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#10b981"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ width: 18, height: 18, flexShrink: 0 }}
+                    aria-hidden="true"
+                  >
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
+                </div>
+              ))}
+            </div>
+          )}
+
           <button
             type="button"
             className="btn pay-btn-solid"
             style={{ width: "100%", padding: "13px 18px", fontSize: 15 }}
-            onClick={() => setPaymentSuccessOpen(false)}
+            onClick={closePaymentSuccess}
           >
             Понятно
           </button>

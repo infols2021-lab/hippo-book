@@ -14,6 +14,7 @@ import React, {
 } from "react";
 import type { QuestionImageMap, ImageMapPoint, ImageMapAnswer } from "@/lib/assignments/types";
 import { getImageUrl } from "@/lib/assignments/image";
+import MediaImage from "./MediaImage";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -61,7 +62,7 @@ function buildCurvePath(x1: number, y1: number, x2: number, y2: number): string 
 }
 
 // ---------------------------------------------------------------------------
-// 🎯 ВЫНЕСЕННАЯ ФУНКЦИЯ ДЛЯ ВИЗУАЛИЗАЦИИ (используется в ReviewPanel)
+// ВЫНЕСЕННАЯ ФУНКЦИЯ ДЛЯ ВИЗУАЛИЗАЦИИ (используется в ReviewPanel)
 // ---------------------------------------------------------------------------
 
 export type ImageMapMatch = Record<string, string>; // answerId -> pointId
@@ -168,6 +169,7 @@ export function ImageMapRenderer({
         alt=""
         decoding="async"
         loading="eager"
+        fetchPriority="high"
         onLoad={handleImageLoad}
         style={{ width: "100%", height: "auto", display: "block", borderRadius: 12 }}
       />
@@ -320,6 +322,8 @@ export default function QuestionImageMap({
   const [selectedAnswerId, setSelectedAnswerId] = useState<string | null>(null);
   const [pointPixels, setPointPixels] = useState<PointPixel[]>([]);
   const [answerAnchors, setAnswerAnchors] = useState<AnswerAnchor[]>([]);
+  const [mapReady, setMapReady] = useState(false);
+  const [mapError, setMapError] = useState(false);
   const answerElRefs = useRef<Map<string, HTMLElement>>(new Map());
   const recalcRequestedRef = useRef(false);
 
@@ -398,7 +402,22 @@ export default function QuestionImageMap({
     };
   }, [recalc]);
 
-  const handleImageLoad = useCallback(() => recalc(), [recalc]);
+  const handleImageLoad = useCallback(() => {
+    setMapReady(true);
+    // Пересчёт точек после отрисовки карты (нужны фактические размеры <img>).
+    requestAnimationFrame(recalc);
+  }, [recalc]);
+
+  // Картинка из кеша браузера иногда не присылает onLoad после гидратации —
+  // дополнительно проверяем готовность по .complete и пересчитываем точки.
+  useEffect(() => {
+    if (mapReady) return;
+    const imgEl = containerRef.current?.querySelector<HTMLImageElement>(".imagemap-image");
+    if (imgEl && imgEl.complete && imgEl.naturalWidth > 0) {
+      setMapReady(true);
+      requestAnimationFrame(recalc);
+    }
+  }, [mapReady, recalc]);
 
   const handleAnswerClick = useCallback(
     (answerId: string) => {
@@ -470,8 +489,8 @@ export default function QuestionImageMap({
         }}
       >
         {selectedAnswerId
-          ? "✅ Ответ выбран – нажмите на нужную точку на карте"
-          : "👆 Сначала нажмите на карточку ответа, затем – на точку на карте"}
+          ? "Ответ выбран — нажмите на нужную точку на карте"
+          : "Сначала нажмите на карточку ответа, затем — на точку на карте"}
       </div>
 
       <div
@@ -526,16 +545,51 @@ export default function QuestionImageMap({
           className="imagemap-map-area"
           style={{ position: "relative", width: "100%", marginBottom: "16px" }}
         >
+          {!mapReady && !mapError && (
+            <div
+              className="animate-pulse"
+              style={{
+                width: "100%",
+                aspectRatio: "16 / 10",
+                borderRadius: 16,
+                background: "#f1f5f9",
+              }}
+            />
+          )}
+          {mapError && (
+            <div
+              style={{
+                width: "100%",
+                aspectRatio: "16 / 10",
+                borderRadius: 16,
+                background: "#f8fafc",
+                border: "1px dashed #e2e8f0",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#94a3b8",
+                fontWeight: 600,
+                fontSize: 13,
+                padding: "0 16px",
+                textAlign: "center",
+                boxSizing: "border-box",
+              }}
+            >
+              Не удалось загрузить изображение
+            </div>
+          )}
           <img
             className="imagemap-image"
             src={imageUrl}
             alt=""
             decoding="async"
             loading="eager"
+            fetchPriority="high"
             onLoad={handleImageLoad}
+            onError={() => setMapError(true)}
             draggable={false}
             style={{
-              display: "block",
+              display: mapReady && !mapError ? "block" : "none",
               width: "100%",
               height: "auto",
               borderRadius: "16px",
@@ -543,7 +597,8 @@ export default function QuestionImageMap({
             }}
           />
 
-          {pointPixels.map((pt) => {
+          {mapReady &&
+            pointPixels.map((pt) => {
             const isConnected = Object.values(value).includes(pt.id);
             const isSelectable = !!selectedAnswerId;
             const cursor = disabled ? "not-allowed" : isSelectable ? "pointer" : "default";
@@ -650,33 +705,14 @@ export default function QuestionImageMap({
                   opacity: disabled && !isConnected ? 0.6 : 1,
                 }}
               >
-                {/* 🔧 ИСПРАВЛЕНО: убран фиксированный размер 120x120, теперь картинка занимает разумное место */}
                 {ans.media && ans.media.length > 0 && (
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      borderRadius: "12px",
-                      overflow: "hidden",
-                      backgroundColor: "#f8fafc",
-                      maxWidth: "100%",
-                    }}
-                  >
-                    <img
-                      src={getImageUrl(ans.media[0].url)}
-                      alt={ans.text || "Ответ"}
-                      decoding="async"
-                      loading="eager"
-                      style={{
-                        width: "auto",
-                        height: "auto",
-                        maxWidth: "180px",
-                        maxHeight: "140px",
-                        objectFit: "contain",
-                      }}
-                    />
-                  </div>
+                  <MediaImage
+                    src={ans.media[0].url}
+                    alt={ans.text || "Ответ"}
+                    boxWidth={180}
+                    boxHeight={140}
+                    radius={12}
+                  />
                 )}
                 {ans.text && (
                   <span
@@ -691,7 +727,20 @@ export default function QuestionImageMap({
                     {ans.text}
                   </span>
                 )}
-                {isConnected && <span style={{ fontSize: 20, lineHeight: 1 }}>✅</span>}
+                {isConnected && (
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#10b981"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ width: 20, height: 20, flexShrink: 0 }}
+                    aria-hidden="true"
+                  >
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
+                )}
                 {isSelected && !isConnected && (
                   <span style={{ fontSize: 12, color: "#6366f1", fontWeight: 600 }}>
                     Теперь выберите точку

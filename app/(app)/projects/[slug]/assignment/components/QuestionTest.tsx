@@ -3,7 +3,7 @@
 import React from "react";
 import type { QuestionTest, TestOption } from "@/lib/assignments/types";
 import MediaRenderer from "./MediaRenderer";
-import { getImageUrl } from "@/lib/assignments/image";
+import MediaImage from "./MediaImage";
 
 type Props = {
   question: QuestionTest;
@@ -57,8 +57,34 @@ export default function QuestionTest({ question, value, onChange, disabled }: Pr
 
   if (options.length === 0) {
     return (
-      <div style={{ color: "#64748b", fontWeight: 600, padding: "16px", background: "#f8fafc", borderRadius: "12px", border: "1px dashed #cbd5e1" }}>
-        ⚠️ Нет вариантов ответа
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          color: "#64748b",
+          fontWeight: 600,
+          padding: "16px",
+          background: "#f8fafc",
+          borderRadius: "12px",
+          border: "1px dashed #cbd5e1",
+        }}
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ width: 16, height: 16, flexShrink: 0 }}
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+        Нет вариантов ответа
       </div>
     );
   }
@@ -66,8 +92,30 @@ export default function QuestionTest({ question, value, onChange, disabled }: Pr
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       {isMultiple && (
-        <div style={{ fontSize: "14px", fontWeight: 700, color: "#64748b", display: "flex", alignItems: "center", gap: "6px" }}>
-          <span style={{ fontSize: "16px" }}>☑️</span> Выберите все подходящие варианты
+        <div
+          style={{
+            fontSize: "14px",
+            fontWeight: 700,
+            color: "#64748b",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+          }}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ width: 14, height: 14, flexShrink: 0 }}
+            aria-hidden="true"
+          >
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <polyline points="9 11 12 14 16 9" />
+          </svg>
+          Выберите все подходящие варианты
         </div>
       )}
 
@@ -170,24 +218,13 @@ export default function QuestionTest({ question, value, onChange, disabled }: Pr
                   </div>
                 )}
 
-                {/* Ограничиваем размер картинок до 120px для UI-стабильности */}
+                {/* Картинки вариантов ограничены 140px; место под них
+                    зарезервировано заранее, чтобы карточки не прыгали
+                    при загрузке (серый скелетон вместо пустоты) */}
                 {opt.media && opt.media.length > 0 && (
                   <div style={{ marginTop: opt.text ? "4px" : "0", display: "flex", justifyContent: "flex-start" }}>
                     {opt.media[0].url?.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i) || opt.media[0].type?.startsWith("image") ? (
-                      <img
-                        src={getImageUrl(opt.media[0].url)}
-                        alt="Медиавариант"
-                        decoding="async"
-                        loading="eager"
-                        style={{
-                          maxWidth: "140px",
-                          maxHeight: "140px",
-                          objectFit: "contain",
-                          borderRadius: "10px",
-                          border: "1px solid rgba(0,0,0,0.05)",
-                          backgroundColor: "#fff"
-                        }}
-                      />
+                      <MediaImage src={opt.media[0].url} alt="Медиавариант" boxWidth={140} boxHeight={140} radius={10} />
                     ) : (
                       <div style={{ maxWidth: "300px", width: "100%" }}>
                         <MediaRenderer media={opt.media} />

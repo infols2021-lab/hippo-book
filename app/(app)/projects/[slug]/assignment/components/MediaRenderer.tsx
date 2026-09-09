@@ -190,7 +190,7 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
     broadcastVolume(v);
   };
 
-  const volIcon = volume === 0 ? "🔇" : volume < 0.4 ? "🔈" : volume < 0.75 ? "🔉" : "🔊";
+  const volIcon = volume === 0 ? "mute" : volume < 0.4 ? "low" : volume < 0.75 ? "mid" : "high";
 
   return (
     <div
@@ -246,7 +246,20 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
             }}
           />
         ) : audioError ? (
-          <span style={{ fontSize: 16 }}>⚠️</span>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ width: 18, height: 18 }}
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
         ) : isPlaying ? (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
             <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
@@ -319,9 +332,22 @@ function CustomAudioPlayer({ url, name }: { url: string; name?: string }) {
         }}
         title={`Громкость: ${Math.round(volume * 100)}%`}
       >
-        <span style={{ fontSize: 14, lineHeight: 1, userSelect: "none" }}>
-          {volIcon}
-        </span>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ width: 16, height: 16, color: "#64748b", flexShrink: 0 }}
+          aria-hidden="true"
+        >
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+          {volIcon === "mute" && <line x1="22" y1="9" x2="16" y2="15" />}
+          {volIcon === "mute" && <line x1="16" y1="9" x2="22" y2="15" />}
+          {volIcon !== "mute" && volIcon !== "low" && <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />}
+          {volIcon === "high" && <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />}
+        </svg>
         <input
           type="range"
           min="0"
@@ -485,33 +511,33 @@ function ZoomableImage({
     >
       {isLoading && !hasError && (
         <div
+          className="animate-pulse"
           style={{
             position: "absolute",
             inset: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
+            background: "#f1f5f9",
             zIndex: 5,
             pointerEvents: "none",
           }}
-        >
-          <div
-            style={{
-              width: 34,
-              height: 34,
-              margin: 0,
-              border: "3px solid rgba(0, 123, 255, 0.12)",
-              borderTopColor: "#007bff",
-              borderRadius: "50%",
-              animation: "mediaSpin 0.8s linear infinite",
-            }}
-          />
-        </div>
+        />
       )}
 
       {hasError ? (
         <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ width: 34, height: 34, margin: "0 auto 8px", color: "#cbd5e1" }}
+            aria-hidden="true"
+          >
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <line x1="9" y1="9" x2="15" y2="15" />
+            <line x1="15" y1="9" x2="9" y2="15" />
+          </svg>
           <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>
             Не удалось загрузить фото
           </div>
@@ -572,7 +598,20 @@ function ZoomableImage({
             textTransform: "uppercase",
           }}
         >
-          🔍 Увеличить
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ width: 12, height: 12, marginRight: 6 }}
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          Увеличить
         </div>
       )}
     </div>
@@ -604,7 +643,19 @@ function PdfViewer({ url, name }: { url: string; name?: string }) {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10, overflow: "hidden" }}>
-          <span style={{ fontSize: 18 }}>📄</span>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#64748b"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ width: 18, height: 18, flexShrink: 0 }}
+            aria-hidden="true"
+          >
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+          </svg>
           <span
             style={{
               fontSize: 13,

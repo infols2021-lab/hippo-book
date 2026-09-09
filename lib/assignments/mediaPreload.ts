@@ -21,19 +21,74 @@ function collectFromMedia(urls: Set<string>, media?: MediaAttachment[]) {
   }
 }
 
-function collectFromQuestion(urls: Set<string>, question: QuestionAny) {
-  collectFromMedia(urls, question.media);
-  if ((question as { image?: string }).image) {
-    pushUrl(urls, (question as { image?: string }).image);
+/** Прямое поле `image` узла (вопрос, вариант, пара, карточка ответа и т.д.). */
+function collectNodeImage(urls: Set<string>, node: unknown) {
+  if (node && typeof node === "object") {
+    const image = (node as { image?: unknown }).image;
+    if (typeof image === "string") pushUrl(urls, image);
+  }
+}
+
+/** Медиа узла: массив `media` и одиночный `centerImage` (matching). */
+function collectNodeMedia(urls: Set<string>, node: unknown) {
+  if (!node || typeof node !== "object") return;
+  collectFromMedia(urls, (node as { media?: MediaAttachment[] }).media);
+  const center = (node as { centerImage?: MediaAttachment }).centerImage;
+  if (center && typeof center === "object" && typeof center.url === "string") {
+    pushUrl(urls, center.url);
+  }
+}
+
+/**
+ * Вложенные узлы вопроса, которые тоже могут нести image/media:
+ * - `options` — варианты ответа (test/reading);
+ * - `pairs` и их стороны `left`/`right` — соединение пар (matching);
+ * - `answers` — карточки ответов (imagemap);
+ * - `points` — точки на карте (imagemap);
+ * - `subQuestions` — подвопросы (complex/reading), обходятся рекурсивно.
+ */
+function questionChildNodes(node: unknown): unknown[] {
+  if (!node || typeof node !== "object") return [];
+  const source = node as Record<string, unknown>;
+  const children: unknown[] = [];
+
+  if (Array.isArray(source.options)) children.push(...source.options);
+
+  if (Array.isArray(source.pairs)) {
+    for (const pair of source.pairs) {
+      if (!pair || typeof pair !== "object") continue;
+      children.push(pair);
+      const p = pair as { left?: unknown; right?: unknown };
+      if (p.left && typeof p.left === "object") children.push(p.left);
+      if (p.right && typeof p.right === "object") children.push(p.right);
+    }
   }
 
-  const options = (question as { options?: unknown[] }).options;
-  if (Array.isArray(options)) {
-    for (const opt of options) {
-      if (opt && typeof opt === "object" && "media" in opt) {
-        collectFromMedia(urls, (opt as { media?: MediaAttachment[] }).media);
-      }
-    }
+  if (Array.isArray(source.answers)) children.push(...source.answers);
+  if (Array.isArray(source.points)) children.push(...source.points);
+  if (Array.isArray(source.subQuestions)) children.push(...source.subQuestions);
+
+  return children;
+}
+
+/**
+ * Рекурсивно собирает все медиа-URL (картинки/аудио/PDF) из вопроса любого типа:
+ * корень вопроса, варианты `options`, пары `pairs`, карточки `answers`, точки
+ * `points`, центральную картинку `centerImage` и подвопросы `subQuestions`.
+ */
+function collectFromQuestion(urls: Set<string>, question: QuestionAny) {
+  const visited = new Set<unknown>();
+  const stack: unknown[] = [question];
+
+  while (stack.length > 0) {
+    const node = stack.pop();
+    if (!node || typeof node !== "object" || visited.has(node)) continue;
+    visited.add(node);
+
+    collectNodeImage(urls, node);
+    collectNodeMedia(urls, node);
+
+    for (const child of questionChildNodes(node)) stack.push(child);
   }
 }
 
@@ -203,14 +258,30 @@ function isImageMediaItem(item: any): boolean {
   return typeof item.url === "string" && IMAGE_FILE_RE.test(item.url);
 }
 
-/** Собирает image/медиа-картинки объекта (вопрос/вариант/пара). */
+/** Собирает URL картинок из объекта и всех его вложенных подузлов вопроса. */
 function collectImageUrls(urls: Set<string>, value: any) {
-  if (!value || typeof value !== "object") return;
-  if (typeof value.image === "string") pushUrl(urls, value.image);
-  if (Array.isArray(value.media)) {
-    for (const item of value.media) {
-      if (isImageMediaItem(item) && typeof item.url === "string") pushUrl(urls, item.url);
+  const visited = new Set<any>();
+  const stack: any[] = [value];
+
+  while (stack.length > 0) {
+    const node = stack.pop();
+    if (!node || typeof node !== "object" || visited.has(node)) continue;
+    visited.add(node);
+
+    if (typeof node.image === "string") pushUrl(urls, node.image);
+
+    if (Array.isArray(node.media)) {
+      for (const item of node.media) {
+        if (isImageMediaItem(item) && typeof item.url === "string") pushUrl(urls, item.url);
+      }
     }
+
+    const center = node.centerImage;
+    if (center && typeof center === "object") {
+      if (isImageMediaItem(center) && typeof center.url === "string") pushUrl(urls, center.url);
+    }
+
+    for (const child of questionChildNodes(node)) stack.push(child);
   }
 }
 
@@ -256,10 +327,12 @@ function preloadImageOnce(url: string, timeoutMs: number): Promise<boolean> {
 
 /**
  * «Мгновенные картинки»: собирает все URL изображений из массива вопросов и
- * ждёт их декодирования. Поля поиска:
+ * ждёт их декодирования. Обход дерева вопроса покрывает:
  * - `image` и массивы `media` в корне вопроса;
- * - внутри каждого `options` (вариант ответа);
- * - внутри каждой пары `pairs` (левая и правая сторона).
+ * - варианты `options` (карточки выбора);
+ * - пары `pairs` (левая и правая сторона соединения) и `centerImage`;
+ * - карточки ответов `answers` и точки `points` (интерактивная карта);
+ * - подвопросы `subQuestions` (комплексные/чтение), рекурсивно.
  * Для каждого URL создаёт `new Image()` и возвращает промис через `img.decode()`.
  * Через `options.onProgress` отдаёт прогресс (загружено / всего).
  */
@@ -272,25 +345,7 @@ export async function preloadAssignmentImages(
 
   for (const question of Array.isArray(questions) ? questions : []) {
     if (!question || typeof question !== "object") continue;
-
     collectImageUrls(urls, question);
-
-    // options — image и media у каждого варианта
-    if (Array.isArray(question.options)) {
-      for (const opt of question.options) {
-        collectImageUrls(urls, opt);
-      }
-    }
-
-    // pairs — image и media слева и справа
-    if (Array.isArray(question.pairs)) {
-      for (const pair of question.pairs) {
-        if (!pair || typeof pair !== "object") continue;
-        collectImageUrls(urls, pair);
-        collectImageUrls(urls, pair.left);
-        collectImageUrls(urls, pair.right);
-      }
-    }
   }
 
   if (typeof window === "undefined" || typeof Image === "undefined") return;
