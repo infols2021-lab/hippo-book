@@ -1,33 +1,28 @@
 // components/prodamus/ProdamusWidgetScript.tsx
 "use client";
 
-import { useState } from "react";
 import Script from "next/script";
 
-const PRODAMUS_WIDGET_PRIMARY = "https://faustova.payform.ru/widget.js";
-const PRODAMUS_WIDGET_FALLBACK = "https://payform.ru/widget.js";
+const PRODAMUS_INIT_SCRIPT = "https://widget.prodamus.ru/src/init.js";
+const PRODAMUS_INIT_CSS = "https://widget.prodamus.ru/src/init.css";
 
 /**
- * Подключает скрипт платёжного виджета Продамуса (lazyOnload).
+ * Подключает официальный платёжный виджет Продамуса (pop-up).
  *
- * Если основной домен магазина (faustova.payform.ru) недоступен/заблокирован —
- * автоматически подключаем общий fallback-домен payform.ru. После загрузки
- * скрипт открывает глобальные window.prodamusPay / window.PayformWidget,
- * которые использует RequestsClient при нажатии «Перейти к оплате».
+ * Скрипт init.js открывает глобальную функцию window.payformInit, которую
+ * вызывает RequestsClient при клике на «Перейти к оплате». Стили init.css
+ * подключаются через <link> — React поднимает их в <head> документа.
  */
 export default function ProdamusWidgetScript() {
-  const [src, setSrc] = useState<string>(PRODAMUS_WIDGET_PRIMARY);
-
   return (
-    <Script
-      id="prodamus-widget-script"
-      strategy="lazyOnload"
-      src={src}
-      onError={() =>
-        setSrc((current) =>
-          current === PRODAMUS_WIDGET_PRIMARY ? PRODAMUS_WIDGET_FALLBACK : current,
-        )
-      }
-    />
+    <>
+      <link rel="stylesheet" href={PRODAMUS_INIT_CSS} />
+      <Script
+        id="prodamus-init-script"
+        src={PRODAMUS_INIT_SCRIPT}
+        strategy="afterInteractive"
+      />
+    </>
   );
 }
+

@@ -1,7 +1,7 @@
 // app/(app)/projects/[slug]/requests/RequestsClient.tsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Modal from "@/components/Modal";
 import { useRouter } from "next/navigation";
 import { useTour } from "@/components/tour/TourProvider";
@@ -92,65 +92,6 @@ type Props = {
   ownedMaterialIds?: string[];
   initialGrants?: GrantedItem[];
 };
-
-// ---------------------------------------------------------------------------
-// Prodamus widget (pop-up оплата)
-// ---------------------------------------------------------------------------
-
-type ProdamusWidgetObject = {
-  open?: (paymentUrl: string, options?: Record<string, unknown>) => unknown;
-  [key: string]: unknown;
-};
-
-type ProdamusGlobal = Record<string, unknown>;
-
-/**
- * Пытается открыть оплату во всплывающем окне (pop-up) Продамуса.
- *
- * Поддерживаемые API (по спецификации виджета):
- *   1. window.PayformWidget?.open(paymentUrl)
- *   2. window.prodamusPay(paymentUrl)
- *   3. window.PayformWidget({ url }) — устаревшая форма.
- *
- * Возвращает true, если виджет принял ссылку. Иначе вызывающий код делает
- * надёжный фоллбэк на переход window.location.assign(paymentUrl) — это
- * покрывает блокировку скрипта адблоком, медленную загрузку и мобильные
- * браузеры.
- */
-function openProdamusWidget(paymentUrl: string): boolean {
-  if (typeof window === "undefined") return false;
-
-  try {
-    const w = window as unknown as ProdamusGlobal;
-    const PayformWidget = w.PayformWidget as ProdamusWidgetObject | undefined;
-
-    // 1) window.PayformWidget?.open(paymentUrl)
-    if (PayformWidget && typeof PayformWidget.open === "function") {
-      PayformWidget.open(paymentUrl);
-      return true;
-    }
-
-    // 2) window.prodamusPay(paymentUrl)
-    if (typeof w.prodamusPay === "function") {
-      (w.prodamusPay as (url: string, options?: Record<string, unknown>) => unknown)(paymentUrl);
-      return true;
-    }
-
-    // 3) window.PayformWidget({ url }) — устаревший вариант API
-    if (typeof PayformWidget === "function") {
-      (PayformWidget as (config?: Record<string, unknown>) => unknown)({ url: paymentUrl });
-      return true;
-    }
-
-    return false;
-  } catch (error) {
-    console.warn(
-      "[RequestsClient] Не удалось открыть виджет Продамуса, переходим по ссылке:",
-      error,
-    );
-    return false;
-  }
-}
 
 function generateRequestNumber() {
   const now = new Date();
@@ -281,40 +222,6 @@ export default function RequestsClient({
 }: Props) {
   const router = useRouter();
   const { stage, advanceTour } = useTour();
-
-  // Защита от повторного редиректа после события «успех» от виджета.
-  const paymentNavHandled = useRef(false);
-  // true — пока открыт pop-up оплаты (реагируем на postMessage только в этот период).
-  const paymentWidgetActive = useRef(false);
-
-  // Слушаем сообщения виджета Продамуса: при статусе success уводим пользователя
-  // в профиль проекта с ?payment=success (там показывается модалка выдачи прав).
-  useEffect(() => {
-    const handleWidgetMessage = (event: MessageEvent) => {
-      try {
-        const payload: unknown = (event as MessageEvent).data;
-        const status =
-          payload && typeof payload === "object"
-            ? String((payload as { status?: unknown }).status ?? "").toLowerCase()
-            : typeof payload === "string"
-            ? payload.toLowerCase()
-            : "";
-
-        if (status !== "success") return;
-        if (!paymentWidgetActive.current) return;
-        if (paymentNavHandled.current) return;
-
-        paymentNavHandled.current = true;
-        paymentWidgetActive.current = false;
-        router.push(`/projects/${project.slug}/profile?payment=success`);
-      } catch {
-        // Игнорируем посторонние сообщения.
-      }
-    };
-
-    window.addEventListener("message", handleWidgetMessage);
-    return () => window.removeEventListener("message", handleWidgetMessage);
-  }, [router, project.slug]);
 
   const [catalogProject, setCatalogProject] = useState<Project>(project);
   const [tabs, setTabs] = useState<ProjectTab[]>(initialTabs);
@@ -448,9 +355,45 @@ export default function RequestsClient({
   const [paymentModalItems, setPaymentModalItems] = useState<PaymentDisplayItem[]>([]);
   const [paymentModalSubtitle, setPaymentModalSubtitle] = useState<string>("");
   const [paymentRequestId, setPaymentRequestId] = useState<string | null>(null);
+  const [paymentRequestNumber, setPaymentRequestNumber] = useState<string | null>(null);
   const [paymentBusy, setPaymentBusy] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Идентификатор заказа для Продамуса: request_number заявки (фолбэк на uuid).
+  // Используется в параметрах виджета и в адресах возврата после оплаты.
+  const currentOrderId = paymentRequestNumber || paymentRequestId;
+
+  // Слушаем события виджета Продамуса (postMessage):
+  // - status "success" — оплата успешна, уводим в профиль проекта
+  //   с ?payment=success (там показывается модалка выдачи прав);
+  // - status "error" — оплата не прошла, уводим на страницу /payment/fail.
+  useEffect(() => {
+    const handleWidgetMessage = (event: MessageEvent) => {
+      const payload = event?.data;
+      if (!payload || typeof payload !== "object") return;
+
+      const status = String((payload as { status?: unknown }).status ?? "").toLowerCase();
+      if (!status) return;
+
+      if (status === "success") {
+        const target = project.slug
+          ? `/projects/${project.slug}/profile?payment=success&order_num=${currentOrderId || ""}`
+          : "/portal?payment=success";
+        router.push(target);
+      }
+
+      if (status === "error") {
+        const target = project.slug
+          ? `/payment/fail?project_slug=${project.slug}&order_num=${currentOrderId || ""}`
+          : "/payment/fail";
+        router.push(target);
+      }
+    };
+
+    window.addEventListener("message", handleWidgetMessage);
+    return () => window.removeEventListener("message", handleWidgetMessage);
+  }, [router, project.slug, currentOrderId]);
 
   useEffect(() => {
     let alive = true;
@@ -721,11 +664,13 @@ export default function RequestsClient({
 
   function openPayment(
     requestId: string,
+    requestNumber: string | null,
     amount: number,
     displayItems: PaymentDisplayItem[],
     subtitle: string
   ) {
     setPaymentRequestId(requestId);
+    setPaymentRequestNumber(requestNumber);
     setPaymentTotalAmount(amount);
     setPaymentModalItems(displayItems);
     setPaymentModalSubtitle(subtitle);
@@ -737,6 +682,7 @@ export default function RequestsClient({
   function payRequest(r: PurchaseRequest) {
     openPayment(
       r.id,
+      r.request_number,
       getRequestPrice(r),
       buildPaymentItemsForRequest(r),
       `Материалы в заявке ${r.request_number}:`
@@ -749,6 +695,48 @@ export default function RequestsClient({
     setPaymentBusy(true);
     setPaymentError(null);
 
+    const orderId = paymentRequestNumber || paymentRequestId;
+    const amount = Number(paymentTotalAmount) || 0;
+    const materialTitles = paymentModalItems
+      .map((item) => item.title)
+      .map((title) => title.trim())
+      .filter(Boolean);
+    const productName = materialTitles.length
+      ? `Доступ к материалам: ${materialTitles.join(", ")}`
+      : "Доступ к материалам";
+
+    // Закрываем внутреннюю модалку нашего сайта — дальше работает виджет.
+    setPaymentModalOpen(false);
+
+    // Официальный виджет Продамуса (pop-up) через window.payformInit (init.js).
+    const payformInit = window.payformInit;
+    if (typeof payformInit === "function") {
+      try {
+        payformInit("faustova.payform.ru", {
+          order_id: orderId,
+          order_sum: amount,
+          currency: "rub",
+          customer_email: userEmail || "",
+          products: [
+            {
+              name: productName,
+              price: amount,
+              quantity: 1,
+            },
+          ],
+        });
+        setPaymentBusy(false);
+        return;
+      } catch (error) {
+        console.warn(
+          "[RequestsClient] Не удалось открыть виджет Продамуса, переходим по ссылке:",
+          error,
+        );
+      }
+    }
+
+    // Фоллбэк: виджет заблокирован или ещё не загрузился — получаем ссылку на
+    // оплату от сервера и переходим по ней.
     try {
       const res = await fetch("/api/payments/prodamus-link", {
         method: "POST",
@@ -765,29 +753,13 @@ export default function RequestsClient({
         throw new Error(json?.error || `HTTP ${res.status}`);
       }
 
-      const paymentUrl = String(json.url);
-
-      // Открываем pop-up оплаты (window.prodamusPay / window.PayformWidget?.open).
-      // Пока виджет открыт — слушаем сообщение об успехе (см. handleWidgetMessage).
-      paymentNavHandled.current = false;
-      paymentWidgetActive.current = true;
-
-      if (openProdamusWidget(paymentUrl)) {
-        // Кнопка снова активна: пользователь может вернуться и повторить попытку.
-        setPaymentBusy(false);
-        return;
-      }
-
-      // Виджет недоступен (адблок / браузер / ещё не загрузился) — надёжный
-      // фоллбэк на переход к платёжной странице Продамуса.
-      paymentWidgetActive.current = false;
-      window.location.assign(paymentUrl);
+      window.location.assign(String(json.url));
     } catch (error) {
-      paymentWidgetActive.current = false;
       const message =
         error instanceof Error ? error.message : "Не удалось сформировать ссылку на оплату";
       setPaymentError(message);
       setPaymentBusy(false);
+      setPaymentModalOpen(true);
     }
   }
 
@@ -996,6 +968,7 @@ export default function RequestsClient({
 
       openPayment(
         createdId,
+        normalizeString(createdRow?.request_number) || requestNumber || createdId,
         createdTotal,
         singleRequestReceipt.items,
         editingId ? "Материалы в заявке:" : "Материалы в созданной заявке:"
