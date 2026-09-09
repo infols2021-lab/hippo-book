@@ -1,7 +1,7 @@
 // app/(app)/projects/[slug]/requests/RequestsClient.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Modal from "@/components/Modal";
 import { useRouter } from "next/navigation";
 import { useTour } from "@/components/tour/TourProvider";
@@ -92,6 +92,10 @@ type Props = {
   ownedMaterialIds?: string[];
   initialGrants?: GrantedItem[];
 };
+
+// Максимальное время ожидания инициализации платёжного виджета Продамуса,
+// после которого оверлей загрузки снимается в любом случае.
+const PAYMENT_LOADING_TIMEOUT_MS = 12_000;
 
 function generateRequestNumber() {
   const now = new Date();
@@ -351,6 +355,8 @@ export default function RequestsClient({
     return map;
   });
 
+  const paymentLoadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [paymentTotalAmount, setPaymentTotalAmount] = useState(0);
   const [paymentModalItems, setPaymentModalItems] = useState<PaymentDisplayItem[]>([]);
   const [paymentModalSubtitle, setPaymentModalSubtitle] = useState<string>("");
@@ -358,6 +364,7 @@ export default function RequestsClient({
   const [paymentRequestNumber, setPaymentRequestNumber] = useState<string | null>(null);
   const [paymentBusy, setPaymentBusy] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [isPaymentLoading, setIsPaymentLoading] = useState(false);
   const [busy, setBusy] = useState(false);
 
   // Идентификатор заказа для Продамуса: request_number заявки (фолбэк на uuid).
@@ -375,6 +382,15 @@ export default function RequestsClient({
 
       const status = String((payload as { status?: unknown }).status ?? "").toLowerCase();
       if (!status) return;
+
+      // Виджет откликнулся (close / waiting / success / error) — оверлей больше
+      // не нужен: снимаем лоадер и гасим таймаут безопасности.
+      setIsPaymentLoading(false);
+      if (paymentLoadingTimerRef.current) {
+        clearTimeout(paymentLoadingTimerRef.current);
+        paymentLoadingTimerRef.current = null;
+      }
+      setPaymentBusy(false);
 
       if (status === "success") {
         const target = project.slug
@@ -394,6 +410,16 @@ export default function RequestsClient({
     window.addEventListener("message", handleWidgetMessage);
     return () => window.removeEventListener("message", handleWidgetMessage);
   }, [router, project.slug, currentOrderId]);
+
+  // На случай размонтирования страницы — гасим таймер оверлея оплаты.
+  useEffect(() => {
+    return () => {
+      if (paymentLoadingTimerRef.current) {
+        clearTimeout(paymentLoadingTimerRef.current);
+        paymentLoadingTimerRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -689,8 +715,31 @@ export default function RequestsClient({
     );
   }
 
+  function startPaymentLoading() {
+    setIsPaymentLoading(true);
+    if (paymentLoadingTimerRef.current) {
+      clearTimeout(paymentLoadingTimerRef.current);
+    }
+    // Таймаут безопасности: если виджет не прислал сообщение (не отрисовался
+    // в DOM либо сетевой сбой) — гарантированно снимаем оверлей загрузки.
+    paymentLoadingTimerRef.current = setTimeout(() => {
+      paymentLoadingTimerRef.current = null;
+      setIsPaymentLoading(false);
+      setPaymentBusy(false);
+    }, PAYMENT_LOADING_TIMEOUT_MS);
+  }
+
+  function stopPaymentLoading() {
+    setIsPaymentLoading(false);
+    if (paymentLoadingTimerRef.current) {
+      clearTimeout(paymentLoadingTimerRef.current);
+      paymentLoadingTimerRef.current = null;
+    }
+    setPaymentBusy(false);
+  }
+
   async function handleProceedToPayment() {
-    if (!paymentRequestId || paymentBusy) return;
+    if (!paymentRequestId || paymentBusy || isPaymentLoading) return;
 
     setPaymentBusy(true);
     setPaymentError(null);
@@ -705,8 +754,10 @@ export default function RequestsClient({
       ? `Доступ к материалам: ${materialTitles.join(", ")}`
       : "Доступ к материалам";
 
-    // Закрываем внутреннюю модалку нашего сайта — дальше работает виджет.
+    // Закрываем внутреннюю модалку заказа и показываем оверлей загрузки: скрипт
+    // виджета подгружает стили, фрейм и банковские шлюзы (до 5-10 секунд).
     setPaymentModalOpen(false);
+    startPaymentLoading();
 
     // Официальный виджет Продамуса (pop-up) через window.payformInit (init.js).
     const payformInit = window.payformInit;
@@ -725,13 +776,15 @@ export default function RequestsClient({
             },
           ],
         });
-        setPaymentBusy(false);
+        // Лоадер остаётся активным до события виджета (postMessage) или
+        // таймаута безопасности — виджет сам сообщит о готовности формы.
         return;
       } catch (error) {
         console.warn(
           "[RequestsClient] Не удалось открыть виджет Продамуса, переходим по ссылке:",
           error,
         );
+        stopPaymentLoading();
       }
     }
 
@@ -753,12 +806,13 @@ export default function RequestsClient({
         throw new Error(json?.error || `HTTP ${res.status}`);
       }
 
+      stopPaymentLoading();
       window.location.assign(String(json.url));
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Не удалось сформировать ссылку на оплату";
+      stopPaymentLoading();
       setPaymentError(message);
-      setPaymentBusy(false);
       setPaymentModalOpen(true);
     }
   }
@@ -1527,7 +1581,7 @@ export default function RequestsClient({
             className="btn pay-btn-solid"
             style={{ width: "100%", padding: "14px 18px", fontSize: 16 }}
             onClick={() => void handleProceedToPayment()}
-            disabled={paymentBusy || !paymentRequestId}
+            disabled={paymentBusy || isPaymentLoading || !paymentRequestId}
           >
             {paymentBusy ? "Формируем ссылку на оплату..." : "Перейти к оплате"}
           </button>
@@ -1556,6 +1610,16 @@ export default function RequestsClient({
           </button>
         </div>
       </Modal>
+
+      {isPaymentLoading && (
+        <div className="fixed inset-0 z-[9999] bg-slate-900/30 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 shadow-xl border border-slate-100 flex flex-col items-center gap-3 max-w-xs text-center">
+            <div className="w-8 h-8 rounded-full border-4 border-slate-200 border-t-slate-700 animate-spin" />
+            <div className="font-medium text-slate-900 text-sm">Подключение к платёжному шлюзу</div>
+            <div className="text-xs text-slate-500">Пожалуйста, подождите, идёт инициализация защищённой формы оплаты...</div>
+          </div>
+        </div>
+      )}
 
       <div className="container">
 
