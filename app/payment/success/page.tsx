@@ -7,13 +7,13 @@ export const metadata = {
 
 export default function PaymentSuccessPage() {
   return (
-    <main className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white text-slate-900 rounded-3xl p-8 shadow-2xl">
-        <div className="w-16 h-16 mx-auto flex items-center justify-center rounded-full bg-emerald-100 mb-5">
+    <main className="min-h-screen flex items-center justify-center p-4 bg-slate-50">
+      <div className="w-full max-w-md bg-white text-slate-900 rounded-3xl p-8 shadow-xl border border-slate-200">
+        <div className="w-14 h-14 mx-auto flex items-center justify-center rounded-full bg-slate-100 mb-5">
           <svg
             viewBox="0 0 24 24"
             fill="none"
-            className="w-8 h-8 text-emerald-600"
+            className="w-7 h-7 text-slate-600"
             stroke="currentColor"
             strokeWidth="2.5"
             strokeLinecap="round"
@@ -24,21 +24,22 @@ export default function PaymentSuccessPage() {
           </svg>
         </div>
 
-        <h1 className="text-2xl font-black text-center mb-2">Оплата прошла успешно</h1>
+        <h1 className="text-2xl font-bold text-center mb-2">Оплата прошла успешно</h1>
         <p className="text-sm text-slate-500 text-center leading-relaxed mb-6">
-          Спасибо! Доступ к выбранным материалам откроется автоматически в течение пары минут
-          после подтверждения платежа.
+          Доступ к выбранным материалам открывается автоматически сразу после подтверждения
+          оплаты. Если доступ не открылся в течение нескольких минут, обратитесь в службу
+          технической поддержки.
         </p>
 
         <Link
           href="/portal"
-          className="block w-full text-center bg-slate-900 text-white font-extrabold rounded-xl py-3 hover:opacity-90"
+          className="block w-full text-center bg-slate-900 text-white font-semibold rounded-xl py-3 hover:bg-slate-800 transition-colors"
         >
           Перейти в кабинет
         </Link>
         <Link
           href="/"
-          className="block w-full text-center text-slate-400 font-bold text-sm mt-3 hover:text-slate-600"
+          className="block w-full text-center text-slate-400 font-semibold text-sm mt-3 hover:text-slate-600"
         >
           На главную
         </Link>

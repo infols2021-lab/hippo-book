@@ -5,6 +5,7 @@ import { TourProvider } from "@/components/tour/TourProvider";
 import ProductTour from "@/components/tour/ProductTour";
 import TourResumeBootstrap from "@/components/tour/TourResumeBootstrap";
 import { TourStage, normalizeTourStage } from "@/lib/tour/tourConfig";
+import ProdamusWidgetScript from "@/components/prodamus/ProdamusWidgetScript";
 
 export default async function AppLayout({
   children,
@@ -61,11 +62,16 @@ export default async function AppLayout({
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white max-w-md w-full rounded-3xl p-8 text-center shadow-xl border border-gray-100">
-          <div className="text-5xl mb-4">⚠️</div>
+          <div className="text-5xl mb-4">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 52, height: 52, color: "#64748b" }} aria-hidden="true">
+              <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+              <path d="M12 9v4M12 17h.01" />
+            </svg>
+          </div>
           <h2 className="text-2xl font-extrabold text-gray-900 mb-2">Проблема с соединением</h2>
           <p className="text-gray-500 mb-8">Не удалось проверить сессию. Проверь интернет или сервер.</p>
           <div className="flex flex-col gap-3">
-            <a href="/portal" className="w-full py-3.5 bg-blue-600 text-white font-bold rounded-xl">🔄 Повторить</a>
+            <a href="/portal" className="w-full py-3.5 bg-blue-600 text-white font-bold rounded-xl">Повторить</a>
             <a href="/login" className="w-full py-3.5 bg-gray-100 text-gray-700 font-bold rounded-xl">← Войти</a>
           </div>
         </div>
@@ -79,6 +85,8 @@ export default async function AppLayout({
 
   return (
     <TourProvider initialStage={initialTourStage}>
+      {/* Скрипт платёжного виджета Продамуса (нужен для оплаты в разделе «Заявки»). */}
+      <ProdamusWidgetScript />
       {children}
       <TourResumeBootstrap />
       <ProductTour />

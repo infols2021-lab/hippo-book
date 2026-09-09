@@ -1,4 +1,5 @@
 /* app/(app)/projects/[slug]/profile/page.tsx */
+import { Suspense } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import ProfileClient from "./ProfileClient";
@@ -9,14 +10,11 @@ export const revalidate = 0;
 
 export default async function ProjectProfilePage({
   params,
-  searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ payment?: string }>;
 }) {
   const supabase = await createSupabaseServerClient();
   const { slug } = await params;
-  const { payment } = await searchParams;
 
   // 1. Проверяем авторизацию
   const {
@@ -75,16 +73,17 @@ export default async function ProjectProfilePage({
   return (
     <>
       <ProfileTourTrigger />
-      <ProfileClient
-        projectName={project.name}
-        projectSlug={project.slug}
-        availableProjects={activeProjects || []}        features={features}
-        userId={user.id}
-        userEmail={user.email || ""}
-        initialProfile={initialProfile}
-        paymentSuccess={payment === "success"}
-        backgroundUrl={backgroundUrl}
-      />
+      <Suspense fallback={null}>
+        <ProfileClient
+          projectName={project.name}
+          projectSlug={project.slug}
+          availableProjects={activeProjects || []}        features={features}
+          userId={user.id}
+          userEmail={user.email || ""}
+          initialProfile={initialProfile}
+          backgroundUrl={backgroundUrl}
+        />
+      </Suspense>
     </>
   );
 }

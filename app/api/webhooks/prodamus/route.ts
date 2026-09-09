@@ -303,7 +303,7 @@ async function findAccountingSheetName(
 
 /**
  * Обновляет лист «Учёт» после успешной оплаты (best-effort, НЕ роняет выдачу):
- *   1. статус строки (колонка G): «⏳ Ожидает» → «✅ Оплачено»;
+ *   1. статус строки (колонка G): «Ожидает» → «Оплачено»;
  *   2. колонка H: сумма платежа с детализацией комиссии.
  *
  * Строка ищется по purchase_requests.sheet_row, иначе — по request_number.
@@ -337,7 +337,7 @@ async function syncAccountingSheet(
     }
 
     // 1. Статус строки на листе «Учёт».
-    await updateGoogleSheetRequestStatus(rowNumber, "✅ Оплачено", sheetName);
+    await updateGoogleSheetRequestStatus(rowNumber, "Оплачено", sheetName);
 
     // 2. Сумма и комиссия в колонку H (8-я колонка):
     //    чистая сумма к выплате = sum - commission_sum.

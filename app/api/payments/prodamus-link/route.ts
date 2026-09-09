@@ -29,15 +29,15 @@ async function safeJson(req: NextRequest) {
 /**
  * Возвращает ссылку на оплату Продамуса для заявки пользователя.
  *
- * order_id = id заявки (purchase_requests.id). Ссылка строится только для
+ * order_id = request_number заявки (фолбэк на id). Ссылка строится только для
  * необработанных заявок текущего пользователя.
  *
- * Тело запроса (опционально):
+ * Тело запроса:
  * - request_id (uuid) — обязательный id заявки;
- * - project_slug / projectSlug — slug ветки (проекта), в профиль которой
- *   вернём покупателя после успешной оплаты;
- * - return_url / returnUrl — относительный путь, куда вернуть при отмене
- *   (иначе формируется из project_slug или используется /portal).
+ * - project_slug / projectSlug — slug ветки (проекта), в контексте которой
+ *   оформляется оплата. Используется для адресов возврата: urlSuccess уводит в
+ *   профиль проекта (?payment=success), urlFail на страницу /payment/fail,
+ *   urlReturn — обратно к заявкам. Без slug — фоллбек на /portal и /payment/fail.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -129,19 +129,18 @@ export async function POST(req: NextRequest) {
     // Продамусу отдаём request_number как order_id — вебхук ищет заявку по нему.
     const orderId = normalizeString(requestRow.request_number) || requestRow.id;
 
-    // Динамический редирект: после успешной оплаты возвращаем пользователя в
-    // профиль именно того проекта (ветки), откуда он инициировал оплату.
-    // Если projectSlug неизвестен — безопасный фоллбек на /portal.
+    // Возврат покупателя после оплаты — всегда в контексте его проекта (ветки).
+    // project_slug обязателен; при его отсутствии используем фоллбек на /portal.
     const projectSlug = normalizeString(body?.project_slug ?? body?.projectSlug);
-    const rawReturnUrl = normalizeString(body?.return_url ?? body?.returnUrl);
-    // Принимаем только относительные пути: urlReturn попадает в открытую ссылку
-    // Продамуса и не должен вести на сторонний origin.
-    const returnUrl = rawReturnUrl.startsWith("/") ? rawReturnUrl : "";
+    const slugPath = projectSlug ? `/projects/${projectSlug}` : "";
 
-    const successPath = projectSlug
-      ? `/projects/${projectSlug}/profile?payment=success&order_num=${orderId}`
-      : `/portal?payment=success&order_num=${orderId}`;
-    const returnPath = returnUrl || (projectSlug ? `/projects/${projectSlug}/requests` : "/portal");
+    const successUrl = slugPath
+      ? `${origin}${slugPath}/profile?payment=success&order_num=${orderId}`
+      : `${origin}/portal?payment=success`;
+    const failUrl = slugPath
+      ? `${origin}/payment/fail?project_slug=${projectSlug}&order_num=${orderId}`
+      : `${origin}/payment/fail`;
+    const returnUrl = slugPath ? `${origin}${slugPath}/requests` : `${origin}/portal`;
 
     const url = buildProdamusPaymentUrl(
       {
@@ -151,8 +150,9 @@ export async function POST(req: NextRequest) {
         materialNames,
       },
       {
-        successUrl: `${origin}${successPath}`,
-        returnUrl: `${origin}${returnPath}`,
+        successUrl,
+        failUrl,
+        returnUrl,
       }
     );
 

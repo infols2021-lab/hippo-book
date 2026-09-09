@@ -250,7 +250,7 @@ export const BASE_TOUR_STEPS: Partial<Record<TourStage, CustomTourStep[]>> = {
       placement: "center",
       title: "Как работают заявки",
       content:
-        "Вы выбираете материалы, создаёте заявку и получаете QR для оплаты. После проверки администратором доступ открывается автоматически.",
+        "Вы выбираете материалы, создаёте заявку и оплачиваете онлайн картой или через СБП. Доступ открывается автоматически сразу после подтверждения оплаты.",
       mascotImage: pickMascotImage("requests_info_text"),
       skipBeacon: true,
       primaryLabel: "Далее",

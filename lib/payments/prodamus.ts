@@ -51,7 +51,9 @@ export type ProdamusWebhookPayload = {
 export type ProdamusPaymentLinkOptions = {
   /** URL, куда Продамус вернёт покупателя после успешной оплаты (urlSuccess). */
   successUrl?: string | null;
-  /** URL, куда Продамус вернёт покупателя при отмене/ошибке оплаты (urlReturn). */
+  /** URL, куда Продамус перенаправит при неуспешной оплате (urlFail). */
+  failUrl?: string | null;
+  /** URL, куда Продамус вернёт покупателя при отмене оплаты (urlReturn). */
   returnUrl?: string | null;
 };
 
@@ -78,7 +80,10 @@ export function buildProdamusPaymentUrl(
   const names = (Array.isArray(input.materialNames) ? input.materialNames : [])
     .map((name) => String(name ?? "").trim())
     .filter(Boolean);
-  const productName = names.join(", ") || "Материалы";
+  // Название позиции в чеке — понятное для клиента, без тестовых заглушек.
+  const productName = names.length
+    ? `Доступ к материалам: ${names.join(", ")}`
+    : "Доступ к материалам";
   const price = Math.round(Number(input.total_price) || 0);
 
   // Ключи продуктов храним в нотации products[0][name] (как ожидает Продамус),
@@ -94,6 +99,10 @@ export function buildProdamusPaymentUrl(
 
   if (options?.successUrl) {
     query.push(`urlSuccess=${encodeURIComponent(options.successUrl)}`);
+  }
+
+  if (options?.failUrl) {
+    query.push(`urlFail=${encodeURIComponent(options.failUrl)}`);
   }
 
   if (options?.returnUrl) {

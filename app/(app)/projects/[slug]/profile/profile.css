@@ -659,7 +659,7 @@
 
 
 /* ==========================================================================
-   📱 МОБИЛЬНАЯ АДАПТАЦИЯ (<= 768px)
+   МОБИЛЬНАЯ АДАПТАЦИЯ (<= 768px)
    ========================================================================== */
 @media (max-width: 768px) {
   .profile-container {
@@ -819,4 +819,27 @@
   .profile-page .support-title {
     display: none !important;
   }
+}
+
+/* ====================================================================
+   Кнопка оплаты — нейтральный тёмный стиль (Apple / Clean UI)
+   Перебивает дефолтный .btn (цветной/проектный) в контексте оплаты.
+   ==================================================================== */
+.btn.pay-btn-solid {
+  background: #0f172a !important; /* slate-900 */
+  border: 1px solid #0f172a !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.16) !important;
+}
+.btn.pay-btn-solid:hover:not(:disabled) {
+  background: #1e293b !important; /* slate-800 */
+  border-color: #1e293b !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.22) !important;
+  transform: none !important;
+  filter: none !important;
+}
+.btn.pay-btn-solid:focus-visible {
+  outline: 2px solid #94a3b8;
+  outline-offset: 2px;
 }

@@ -171,7 +171,12 @@ export default function PricingClient({ projects, tabs, materials, lastUpdateDat
           <div className="materials-container">
             {filteredMaterials.length === 0 ? (
               <div className="empty-state">
-                <span className="empty-state-icon">📭</span>
+                <span className="empty-state-icon" style={{ color: "#94a3b8" }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 52, height: 52 }} aria-hidden="true">
+                    <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+                    <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+                  </svg>
+                </span>
                 <h3>Материалов пока нет</h3>
                 <p>В этом разделе еще не добавлены материалы. Выберите другой раздел или направление.</p>
               </div>
@@ -186,14 +191,19 @@ export default function PricingClient({ projects, tabs, materials, lastUpdateDat
                         {cover ? (
                           <img src={cover} alt={m.title} loading="lazy" />
                         ) : (
-                          <div className="mat-cover-placeholder">📚</div>
+                          <div className="mat-cover-placeholder" style={{ color: "#94a3b8" }}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 46, height: 46 }} aria-hidden="true">
+                              <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                              <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                            </svg>
+                          </div>
                         )}
                         <div className="mat-price">{price} ₽</div>
                       </div>
                       <div className="mat-body">
                         <div className="mat-title" title={m.title}>{m.title}</div>
                         <div className="mat-desc">
-                          {m.description || "Доступ выдается администратором после оплаты"}
+                          {m.description || "Доступ открывается автоматически после оплаты"}
                         </div>
                       </div>
                     </div>
@@ -213,15 +223,15 @@ export default function PricingClient({ projects, tabs, materials, lastUpdateDat
               <div className="steps">
                 <div className="step">
                   <div className="step-num" style={{ background: projectColor }}>1</div>
-                  <div className="step-text">Сформируйте заявку в личном кабинете. Вы получите <strong>QR-код</strong> для оплаты через СБП.</div>
+                  <div className="step-text">Сформируйте заявку в личном кабинете — выберите материалы и подтвердите заказ.</div>
                 </div>
                 <div className="step">
                   <div className="step-num" style={{ background: projectColor }}>2</div>
-                  <div className="step-text">Оплатите по QR-коду в приложении любого удобного банка.</div>
+                  <div className="step-text">Оплатите в защищённом окне банковской картой или через СБП.</div>
                 </div>
                 <div className="step">
                   <div className="step-num" style={{ background: projectColor }}>3</div>
-                  <div className="step-text">Доступ откроется автоматически или в течение <strong>24 часов</strong> после проверки.</div>
+                  <div className="step-text">Доступ к материалам откроется автоматически сразу после подтверждения оплаты.</div>
                 </div>
               </div>
             </div>

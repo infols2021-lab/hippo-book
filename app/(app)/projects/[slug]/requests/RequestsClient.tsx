@@ -1,7 +1,7 @@
 // app/(app)/projects/[slug]/requests/RequestsClient.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Modal from "@/components/Modal";
 import { useRouter } from "next/navigation";
 import { useTour } from "@/components/tour/TourProvider";
@@ -97,58 +97,52 @@ type Props = {
 // Prodamus widget (pop-up оплата)
 // ---------------------------------------------------------------------------
 
-/** Объект-экземпляр виджета (после инициализации скриптом widget.js). */
-type ProdamusWidgetInstance = {
-  open?: (paymentUrl: string, options?: Record<string, unknown>) => void;
-  show?: (paymentUrl: string, options?: Record<string, unknown>) => void;
+type ProdamusWidgetObject = {
+  open?: (paymentUrl: string, options?: Record<string, unknown>) => unknown;
   [key: string]: unknown;
 };
 
-/** Глобальный API, который может оставить виджет: PayformWidget / payform. */
-type ProdamusWidgetApi = ProdamusWidgetInstance | ((config?: unknown) => unknown);
-
-/** Возвращает глобальный объект виджета или null, если скрипт не загрузился. */
-function getProdamusWidget(): ProdamusWidgetApi | null {
-  if (typeof window === "undefined") return null;
-
-  const w = window as unknown as Record<string, unknown>;
-  const api = w.PayformWidget ?? w.payform ?? w.payformWidget;
-
-  if (typeof api === "function") return api as ProdamusWidgetApi;
-  if (api && typeof api === "object") return api as ProdamusWidgetApi;
-
-  return null;
-}
+type ProdamusGlobal = Record<string, unknown>;
 
 /**
- * Пытается открыть оплату во всплывающем окне виджета Продамуса.
+ * Пытается открыть оплату во всплывающем окне (pop-up) Продамуса.
+ *
+ * Поддерживаемые API (по спецификации виджета):
+ *   1. window.PayformWidget?.open(paymentUrl)
+ *   2. window.prodamusPay(paymentUrl)
+ *   3. window.PayformWidget({ url }) — устаревшая форма.
  *
  * Возвращает true, если виджет принял ссылку. Иначе вызывающий код делает
- * безопасный фоллбэк на обычный редирект (window.location) — это покрывает
- * блокировку скрипта адблоком, медленную загрузку и мобильные браузеры.
+ * надёжный фоллбэк на переход window.location.assign(paymentUrl) — это
+ * покрывает блокировку скрипта адблоком, медленную загрузку и мобильные
+ * браузеры.
  */
 function openProdamusWidget(paymentUrl: string): boolean {
-  try {
-    const widget = getProdamusWidget();
-    if (!widget) return false;
+  if (typeof window === "undefined") return false;
 
-    // Вариант 1: объект с методом open/show (самый распространённый).
-    if (typeof widget === "object") {
-      const instance = widget as ProdamusWidgetInstance;
-      if (typeof instance.open === "function") {
-        instance.open(paymentUrl);
-        return true;
-      }
-      if (typeof instance.show === "function") {
-        instance.show(paymentUrl);
-        return true;
-      }
-      return false;
+  try {
+    const w = window as unknown as ProdamusGlobal;
+    const PayformWidget = w.PayformWidget as ProdamusWidgetObject | undefined;
+
+    // 1) window.PayformWidget?.open(paymentUrl)
+    if (PayformWidget && typeof PayformWidget.open === "function") {
+      PayformWidget.open(paymentUrl);
+      return true;
     }
 
-    // Вариант 2: сама функция PayformWidget/payform({ url }).
-    widget({ url: paymentUrl });
-    return true;
+    // 2) window.prodamusPay(paymentUrl)
+    if (typeof w.prodamusPay === "function") {
+      (w.prodamusPay as (url: string, options?: Record<string, unknown>) => unknown)(paymentUrl);
+      return true;
+    }
+
+    // 3) window.PayformWidget({ url }) — устаревший вариант API
+    if (typeof PayformWidget === "function") {
+      (PayformWidget as (config?: Record<string, unknown>) => unknown)({ url: paymentUrl });
+      return true;
+    }
+
+    return false;
   } catch (error) {
     console.warn(
       "[RequestsClient] Не удалось открыть виджет Продамуса, переходим по ссылке:",
@@ -287,6 +281,40 @@ export default function RequestsClient({
 }: Props) {
   const router = useRouter();
   const { stage, advanceTour } = useTour();
+
+  // Защита от повторного редиректа после события «успех» от виджета.
+  const paymentNavHandled = useRef(false);
+  // true — пока открыт pop-up оплаты (реагируем на postMessage только в этот период).
+  const paymentWidgetActive = useRef(false);
+
+  // Слушаем сообщения виджета Продамуса: при статусе success уводим пользователя
+  // в профиль проекта с ?payment=success (там показывается модалка выдачи прав).
+  useEffect(() => {
+    const handleWidgetMessage = (event: MessageEvent) => {
+      try {
+        const payload: unknown = (event as MessageEvent).data;
+        const status =
+          payload && typeof payload === "object"
+            ? String((payload as { status?: unknown }).status ?? "").toLowerCase()
+            : typeof payload === "string"
+            ? payload.toLowerCase()
+            : "";
+
+        if (status !== "success") return;
+        if (!paymentWidgetActive.current) return;
+        if (paymentNavHandled.current) return;
+
+        paymentNavHandled.current = true;
+        paymentWidgetActive.current = false;
+        router.push(`/projects/${project.slug}/profile?payment=success`);
+      } catch {
+        // Игнорируем посторонние сообщения.
+      }
+    };
+
+    window.addEventListener("message", handleWidgetMessage);
+    return () => window.removeEventListener("message", handleWidgetMessage);
+  }, [router, project.slug]);
 
   const [catalogProject, setCatalogProject] = useState<Project>(project);
   const [tabs, setTabs] = useState<ProjectTab[]>(initialTabs);
@@ -729,7 +757,6 @@ export default function RequestsClient({
         body: JSON.stringify({
           request_id: paymentRequestId,
           project_slug: project.slug,
-          return_url: `/projects/${project.slug}/requests`,
         }),
       });
       const { json } = await safeReadJson(res);
@@ -740,13 +767,23 @@ export default function RequestsClient({
 
       const paymentUrl = String(json.url);
 
-      // Приоритет — pop-up виджет Продамуса. Если он недоступен (адблок,
-      // ещё не загрузился, мобильный браузер) — безопасный фоллбэк на
-      // обычный переход на платёжную страницу.
-      if (!openProdamusWidget(paymentUrl)) {
-        window.location.assign(paymentUrl);
+      // Открываем pop-up оплаты (window.prodamusPay / window.PayformWidget?.open).
+      // Пока виджет открыт — слушаем сообщение об успехе (см. handleWidgetMessage).
+      paymentNavHandled.current = false;
+      paymentWidgetActive.current = true;
+
+      if (openProdamusWidget(paymentUrl)) {
+        // Кнопка снова активна: пользователь может вернуться и повторить попытку.
+        setPaymentBusy(false);
+        return;
       }
+
+      // Виджет недоступен (адблок / браузер / ещё не загрузился) — надёжный
+      // фоллбэк на переход к платёжной странице Продамуса.
+      paymentWidgetActive.current = false;
+      window.location.assign(paymentUrl);
     } catch (error) {
+      paymentWidgetActive.current = false;
       const message =
         error instanceof Error ? error.message : "Не удалось сформировать ссылку на оплату";
       setPaymentError(message);
@@ -1490,8 +1527,8 @@ export default function RequestsClient({
 
           <div
             style={{
-              background: "color-mix(in srgb, var(--project-primary) 7%, transparent)",
-              border: "1px solid color-mix(in srgb, var(--project-primary) 25%, transparent)",
+              background: "#f8fafc",
+              border: "1px solid #e2e8f0",
               borderRadius: 14,
               padding: "14px 16px",
               marginBottom: 18,
@@ -1499,13 +1536,14 @@ export default function RequestsClient({
           >
             <div style={{ fontSize: "15px", fontWeight: 800, marginBottom: 6 }}>
               Сумма к оплате:{" "}
-              <span style={{ fontSize: "19px", color: "var(--project-primary)" }}>
+              <span style={{ fontSize: "19px", color: "#0f172a" }}>
                 {paymentTotalAmount > 0 ? `${paymentTotalAmount} руб.` : "0 руб."}
               </span>
             </div>
             <div style={{ fontSize: 13, lineHeight: 1.5, opacity: 0.85, fontWeight: 600 }}>
-              Оплата проходит через защищённую платёжную страницу — банковской картой или через
-              СБП. После успешной оплаты доступ к материалам откроется автоматически.
+              После нажатия на кнопку откроется окно оплаты. Оплата доступна через СБП или
+              банковской картой. Доступ к материалам откроется автоматически сразу после
+              завершения платежа.
             </div>
           </div>
         </div>
@@ -1513,39 +1551,12 @@ export default function RequestsClient({
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <button
             type="button"
-            className="btn pay-cta"
-            style={{
-              width: "100%",
-              padding: "14px 18px",
-              fontSize: 16,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-              background: "linear-gradient(135deg, #22d3ee 0%, #6366f1 55%, #8b5cf6 100%)",
-              color: "#fff",
-              border: "1px solid rgba(255,255,255,0.25)",
-              boxShadow: "0 10px 24px rgba(99,102,241,0.35)",
-              backdropFilter: "blur(10px)",
-            }}
+            className="btn pay-btn-solid"
+            style={{ width: "100%", padding: "14px 18px", fontSize: 16 }}
             onClick={() => void handleProceedToPayment()}
             disabled={paymentBusy || !paymentRequestId}
           >
-            {paymentBusy ? (
-              "Формируем ссылку на оплату..."
-            ) : (
-              <>
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  style={{ width: 18, height: 18 }}
-                  aria-hidden="true"
-                >
-                  <path d="M13 2 3 14h7l-1 8 11-12h-7l1-8z" />
-                </svg>
-                Оплатить картой или СБП
-              </>
-            )}
+            {paymentBusy ? "Формируем ссылку на оплату..." : "Перейти к оплате"}
           </button>
 
           {paymentError && (
@@ -1706,30 +1717,11 @@ export default function RequestsClient({
                             ) : (
                               <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", flexWrap: "wrap" }}>
                                 <button
-                                  className="btn btn-small pay-btn"
+                                  className="btn btn-small pay-btn-solid"
                                   onClick={() => void payRequest(r)}
                                   type="button"
                                   disabled={busy}
-                                  style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: 6,
-                                    background:
-                                      "linear-gradient(135deg, #22d3ee 0%, #6366f1 55%, #8b5cf6 100%)",
-                                    color: "#fff",
-                                    border: "1px solid rgba(255,255,255,0.25)",
-                                    boxShadow: "0 6px 18px rgba(99,102,241,0.35)",
-                                    backdropFilter: "blur(10px)",
-                                  }}
                                 >
-                                  <svg
-                                    viewBox="0 0 24 24"
-                                    fill="currentColor"
-                                    style={{ width: 13, height: 13 }}
-                                    aria-hidden="true"
-                                  >
-                                    <path d="M13 2 3 14h7l-1 8 11-12h-7l1-8z" />
-                                  </svg>
                                   Оплатить
                                 </button>
                                 <button
@@ -1790,30 +1782,11 @@ export default function RequestsClient({
                           ) : (
                             <>
                               <button
-                                className="btn btn-small pay-btn"
+                                className="btn btn-small pay-btn-solid"
                                 onClick={() => void payRequest(r)}
                                 type="button"
                                 disabled={busy}
-                                style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 6,
-                                  background:
-                                    "linear-gradient(135deg, #22d3ee 0%, #6366f1 55%, #8b5cf6 100%)",
-                                  color: "#fff",
-                                  border: "1px solid rgba(255,255,255,0.25)",
-                                  boxShadow: "0 6px 18px rgba(99,102,241,0.35)",
-                                  backdropFilter: "blur(10px)",
-                                }}
                               >
-                                <svg
-                                  viewBox="0 0 24 24"
-                                  fill="currentColor"
-                                  style={{ width: 13, height: 13 }}
-                                  aria-hidden="true"
-                                >
-                                  <path d="M13 2 3 14h7l-1 8 11-12h-7l1-8z" />
-                                </svg>
                                 Оплатить
                               </button>
                               <button

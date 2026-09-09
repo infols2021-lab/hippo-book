@@ -2,8 +2,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getStoragePublicUrl } from "@/lib/storage/publicUrl";
 import Modal from "@/components/Modal";
 import StreakLeaderboardModal from "@/components/rewards/StreakLeaderboardModal";
@@ -88,7 +88,6 @@ type Props = {
   userEmail: string;
   initialProfile: ProfileData;
   backgroundUrl: string | null;
-  paymentSuccess?: boolean;
   stats?: Stats | null;
   materialsProgress?: MaterialProgressItem[] | null;
   streak?: StreakData | null;
@@ -158,7 +157,6 @@ export default function ProfileClient({
   userEmail,
   initialProfile,
   backgroundUrl,
-  paymentSuccess = false,
   stats: statsProp,
   materialsProgress: progressProp,
   streak: streakProp,
@@ -166,7 +164,10 @@ export default function ProfileClient({
 }: Props) {
   const router = useRouter();
   const { stage, advanceTour } = useTour();
+  const searchParams = useSearchParams();
   const backgroundProxyUrl = useMemo(() => toStorageProxyUrl(backgroundUrl), [backgroundUrl]);
+  // Защита от повторной обработки ?payment=success (например, при re-render).
+  const paymentHandled = useRef(false);
 
   const [profile, setProfile] = useState<ProfileData>(initialProfile);
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -275,15 +276,46 @@ export default function ProfileClient({
     setTimeout(() => setNotif(null), 3500);
   }
 
-  // Уведомление об успешной оплате после редиректа с Продамуса (?payment=success).
+  // Перезагрузка прогресса и списка доступных материалов (запрос с сервера, no-store).
+  const reloadProgress = useCallback(async () => {
+    try {
+      setProgressLoading(true);
+      setProgressError(null);
+      const res = await fetch(`/api/profile-progress?slug=${projectSlug}`, {
+        cache: "no-store",
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось загрузить прогресс");
+
+      setStats(json.stats as Stats);
+      setMaterialsProgress(json.materialsProgress as MaterialProgressItem[]);
+    } catch (error) {
+      setProgressError(normalizeUiErrorMessage(error, "Не удалось загрузить прогресс"));
+    } finally {
+      setProgressLoading(false);
+    }
+  }, [projectSlug]);
+
+  // Возврат после успешной оплаты (?payment=success): чистим адрес, сбрасываем
+  // кэш Next.js и клиентские данные (чтобы материалы сразу стали доступны),
+  // затем показываем модалку. Пользователь остаётся в профиле.
   useEffect(() => {
-    if (!paymentSuccess) return;
-    setPaymentSuccessOpen(true);
-    // Чистим query-параметр, чтобы модалка не всплывала при обновлении страницы.
+    if (paymentHandled.current) return;
+    if (searchParams.get("payment") !== "success") return;
+    paymentHandled.current = true;
+
+    // 1. Сразу чистим query-параметр, чтобы модалка не сработала при обновлении.
     if (typeof window !== "undefined" && window.history?.replaceState) {
       window.history.replaceState({}, "", window.location.pathname);
     }
-  }, [paymentSuccess]);
+
+    // 2. Принудительно сбрасываем серверный кэш и обновляем данные клиента.
+    router.refresh();
+    void reloadProgress();
+
+    // 3. Модалка успешной оплаты.
+    setPaymentSuccessOpen(true);
+  }, [searchParams, router, reloadProgress]);
 
   const fetchStreakData = async () => {
     try {
@@ -369,26 +401,8 @@ export default function ProfileClient({
 
   useEffect(() => {
     if (statsProp && progressProp) return;
-
-    async function loadProgress() {
-      try {
-        setProgressLoading(true);
-        setProgressError(null);
-        const res = await fetch(`/api/profile-progress?slug=${projectSlug}`, { cache: "no-store" });
-        const json = await res.json().catch(() => null);
-        if (!res.ok || !json?.ok) throw new Error(json?.error || "Не удалось загрузить прогресс");
-
-        setStats(json.stats as Stats);
-        setMaterialsProgress(json.materialsProgress as MaterialProgressItem[]);
-      } catch (e: any) {
-        setProgressError(normalizeUiErrorMessage(e, "Не удалось загрузить прогресс"));
-      } finally {
-        setProgressLoading(false);
-      }
-    }
-
-    void loadProgress();
-  }, [statsProp, progressProp, projectSlug]);
+    void reloadProgress();
+  }, [reloadProgress, statsProp, progressProp]);
 
   function openRewards(tab: RewardsTabType = "wardrobe") {
     // Награды теперь на отдельной странице. При первом открытии из тура —
@@ -593,25 +607,25 @@ export default function ProfileClient({
         </div>
       )}
 
-      {/* Успешная оплата — редирект с Продамуса через ?payment=success */}
+      {/* Модалка успешной оплаты — редирект с Продамуса через ?payment=success */}
       <Modal
         open={paymentSuccessOpen}
         onClose={() => setPaymentSuccessOpen(false)}
-        title="Оплата прошла успешно 🎉"
-        maxWidth={480}
+        title="Оплата успешно завершена"
+        maxWidth={440}
       >
-        <div style={{ textAlign: "center", padding: "8px 4px 4px" }}>
+        <div style={{ textAlign: "center", padding: "6px 4px 2px" }}>
           <div
             style={{
-              width: 72,
-              height: 72,
+              width: 64,
+              height: 64,
               margin: "0 auto 18px",
               borderRadius: "50%",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              background: "linear-gradient(135deg, #34d399 0%, #10b981 100%)",
-              boxShadow: "0 12px 28px rgba(16,185,129,0.35)",
+              backgroundColor: "#f1f5f9",
+              border: "1px solid #e2e8f0",
             }}
           >
             <svg
@@ -621,51 +635,35 @@ export default function ProfileClient({
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
-              style={{ width: 36, height: 36, color: "#ffffff" }}
+              style={{ width: 30, height: 30, color: "#0f172a" }}
               aria-hidden="true"
             >
               <path d="M20 6L9 17l-5-5" />
             </svg>
           </div>
-          <p style={{ margin: "0 0 6px", fontWeight: 800, fontSize: 16 }}>
-            Доступ к материалам открыт!
+          <p style={{ margin: "0 0 8px", fontWeight: 800, fontSize: 16 }}>
+            Доступ к материалам предоставлен
           </p>
           <p
             style={{
-              margin: "0 auto 22px",
-              maxWidth: 360,
+              margin: "0 auto 24px",
+              maxWidth: 340,
               fontSize: 13.5,
               lineHeight: 1.55,
-              opacity: 0.85,
+              color: "#64748b",
               fontWeight: 500,
             }}
           >
-            Платёж подтверждён — права на выбранные материалы уже выданы. Приятного
-            обучения!
+            Вы можете приступить к обучению в любое удобное время.
           </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <Link
-              href={`/projects/${projectSlug}/materials`}
-              className="btn"
-              style={{
-                width: "100%",
-                padding: "13px 18px",
-                fontSize: 15,
-                textAlign: "center",
-                textDecoration: "none",
-              }}
-            >
-              Перейти к материалам
-            </Link>
-            <button
-              type="button"
-              className="btn ghost"
-              style={{ width: "100%" }}
-              onClick={() => setPaymentSuccessOpen(false)}
-            >
-              Остаться в профиле
-            </button>
-          </div>
+          <button
+            type="button"
+            className="btn pay-btn-solid"
+            style={{ width: "100%", padding: "13px 18px", fontSize: 15 }}
+            onClick={() => setPaymentSuccessOpen(false)}
+          >
+            Понятно
+          </button>
         </div>
       </Modal>
 
@@ -1171,7 +1169,9 @@ export default function ProfileClient({
                 }}
               >
                 Материалы пока не доступны
-                <div style={{ marginTop: 8, fontSize: "14px" }}>Обратитесь к администратору для получения доступа</div>
+                <div style={{ marginTop: 8, fontSize: "14px" }}>
+                  Доступ к материалам предоставляется автоматически сразу после подтверждения оплаты.
+                </div>
               </div>
             ) : (
               <>
