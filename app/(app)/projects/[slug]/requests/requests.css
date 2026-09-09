@@ -4,6 +4,7 @@
   margin: 0;
   padding: 0;
   font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
 }
 
 /* Отступ снизу на мобилках, чтобы контент не перекрывался плавающей панелью BottomNav */
@@ -571,11 +572,14 @@
 
   .request-card-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
+    min-width: 0;
   }
 
   .request-card-actions button {
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   .requests-actions {
@@ -639,5 +643,39 @@
   .requests-vitrine-card-btn {
     padding: 3px 6px !important;
     font-size: 10px !important;
+  }
+}
+
+/* =========================================================
+   ОЧЕНЬ УЗКИЕ ТЕЛЕФОНЫ (< 480px): экшены заявок столбиком,
+   чтобы кнопки не вылезали за границы экрана
+   ========================================================= */
+
+@media (max-width: 480px) {
+  .page-requests {
+    overflow-x: hidden;
+  }
+
+  .request-card-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .request-card-actions button {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .requests-cards-mobile {
+    gap: 10px;
+  }
+
+  .request-card-mobile {
+    padding: 14px;
+  }
+
+  .request-card-header {
+    flex-wrap: wrap;
+    gap: 6px;
   }
 }

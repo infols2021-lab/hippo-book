@@ -7,8 +7,8 @@ export const metadata = {
 
 export default function PaymentFailPage() {
   return (
-    <main className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white text-slate-900 rounded-3xl p-8 shadow-2xl">
+    <main className="min-h-screen flex items-center justify-center p-3 sm:p-4 overflow-x-hidden">
+      <div className="w-full max-w-md bg-white text-slate-900 rounded-3xl p-6 sm:p-8 shadow-2xl">
         <div className="w-16 h-16 mx-auto flex items-center justify-center rounded-full bg-amber-100 mb-5">
           <svg
             viewBox="0 0 24 24"
@@ -25,7 +25,7 @@ export default function PaymentFailPage() {
           </svg>
         </div>
 
-        <h1 className="text-2xl font-black text-center mb-2">Оплата не прошла</h1>
+        <h1 className="text-xl sm:text-2xl font-black text-center mb-2">Оплата не прошла</h1>
         <p className="text-sm text-slate-500 text-center leading-relaxed mb-6">
           Возможно, вы отменили платёж или произошла ошибка — деньги не списаны. Попробуйте ещё
           раз или напишите в поддержку.

@@ -108,28 +108,22 @@ export function buildProdamusPaymentUrl(
 // ----------------------------------------------------------------------------
 
 /**
- * Верификация подписи Продамуса.
+ * Каноническая строка для подписи по правилам Продамуса.
  *
- * ВАЖНО: Продамус НЕ подписывает сырое тело запроса. Он сортирует данные
- * рекурсивно по своим правилам, склеивает их, а затем считает
- * HMAC-SHA256(hex) от полученной строки.
+ * ВАЖНО: Продамус НЕ подписывает сырое тело запроса. Он сортирует ключи
+ * рекурсивно (в т.ч. внутри вложенных массивов/объектов), склеивает их в
+ * строку `key=value`, затем считает HMAC-SHA256(hex) от полученной строки.
  *
- * @param bodyObj          Распарсенное тело вебхука (json → объект, form → плоский объект)
- * @param signatureHeader  Значение заголовка Sign
- * @param secretKey        PRODAMUS_SECRET_KEY (опционально, иначе читается из env)
+ * Строка вынесена отдельно, чтобы вебхук мог залогировать её при расхождении
+ * подписей (сгенерированная vs полученная) — это резко ускоряет диагностику.
+ *
+ * @param bodyObj Распарсенное тело вебхука (json → объект, form → плоский объект)
  */
-export function verifyProdamusSignature(
+export function buildProdamusSignatureString(
   bodyObj: Record<string, unknown> | null | undefined,
-  signatureHeader: string | null | undefined,
-  secretKey?: string,
-): boolean {
-  if (!bodyObj || typeof bodyObj !== "object" || !signatureHeader) {
-    return false;
-  }
-
-  const secret = secretKey || mustEnv("PRODAMUS_SECRET_KEY");
-  if (!secret) {
-    return false;
+): string {
+  if (!bodyObj || typeof bodyObj !== "object") {
+    return "";
   }
 
   // Рекурсивный алгоритм сортировки и склейки по правилам Продамуса
@@ -154,74 +148,73 @@ export function verifyProdamusSignature(
   delete dataToSign.sign;
   delete dataToSign.Sign;
 
-  const encodedStr = encode(dataToSign);
+  return encode(dataToSign);
+}
 
-  const expectedSign = createHmac("sha256", secret)
-    .update(encodedStr)
-    .digest("hex")
-    .toLowerCase();
+/**
+ * Считает ожидаемую подпись HMAC-SHA256(hex) для тела вебхука.
+ *
+ * Секретный ключ из PRODAMUS_SECRET_KEY обязательно `.trim()` — в переменных
+ * окружения (особенно при чтении из .env) часто прилипают пробелы/переносы,
+ * из-за которых подпись никогда не совпадёт.
+ *
+ * @param bodyObj   Распарсенное тело вебхука
+ * @param secretKey PRODAMUS_SECRET_KEY (опционально, иначе читается из env)
+ */
+export function computeProdamusSignature(
+  bodyObj: Record<string, unknown> | null | undefined,
+  secretKey?: string,
+): string {
+  const secret = String(secretKey || mustEnv("PRODAMUS_SECRET_KEY") || "").trim();
+  if (!secret) {
+    return "";
+  }
 
-  // Безопасное сравнение (timing-safe)
+  const encodedStr = buildProdamusSignatureString(bodyObj);
+  if (!encodedStr) {
+    return "";
+  }
+
+  return createHmac("sha256", secret).update(encodedStr).digest("hex").toLowerCase();
+}
+
+/**
+ * Верификация подписи Продамуса.
+ *
+ * @param bodyObj          Распарсенное тело вебхука (json → объект, form → плоский объект)
+ * @param signatureHeader  Значение заголовка Sign
+ * @param secretKey        PRODAMUS_SECRET_KEY (опционально, иначе читается из env)
+ */
+export function verifyProdamusSignature(
+  bodyObj: Record<string, unknown> | null | undefined,
+  signatureHeader: string | null | undefined,
+  secretKey?: string,
+): boolean {
+  if (!bodyObj || typeof bodyObj !== "object" || !signatureHeader) {
+    return false;
+  }
+
   try {
+    const expectedSign = computeProdamusSignature(bodyObj, secretKey);
+    if (!expectedSign) {
+      return false;
+    }
+
+    // Безопасное сравнение (timing-safe)
     const expectedBuffer = Buffer.from(expectedSign, "hex");
-    const actualBuffer = Buffer.from(signatureHeader.toLowerCase(), "hex");
+    const actualBuffer = Buffer.from(String(signatureHeader).trim().toLowerCase(), "hex");
 
     if (expectedBuffer.length !== actualBuffer.length) {
       return false;
     }
 
     return timingSafeEqual(expectedBuffer, actualBuffer);
-  } catch {
+  } catch (error) {
+    console.error(
+      "[Prodamus] verifyProdamusSignature error:",
+      error instanceof Error ? error.message : String(error),
+    );
     return false;
   }
 }
 
-// ----------------------------------------------------------------------------
-// Парсинг тела вебхука
-// ----------------------------------------------------------------------------
-
-/**
- * Парсит сырое тело вебхука Продамуса в JS-объект.
- *
- * Продамус может слать как application/json, так и
- * application/x-www-form-urlencoded. Вернувшийся объект передаётся
- * в verifyProdamusSignature как есть.
- *
- * @param rawBody     Сырое тело запроса (req.text())
- * @param contentType Значение заголовка content-type
- */
-export function parseProdamusBody(
-  rawBody: string,
-  contentType?: string | null,
-): Record<string, unknown> {
-  const type = String(contentType ?? "").toLowerCase();
-  const text = String(rawBody ?? "").trim();
-
-  if (!text) {
-    return {};
-  }
-
-  if (type.includes("application/json")) {
-    try {
-      const json: unknown = JSON.parse(text);
-      return json && typeof json === "object" && !Array.isArray(json)
-        ? (json as Record<string, unknown>)
-        : {};
-    } catch {
-      return {};
-    }
-  }
-
-  // urlencoded: плоский словарь key => value.
-  const obj: Record<string, unknown> = {};
-
-  try {
-    for (const [key, value] of new URLSearchParams(text).entries()) {
-      obj[key] = typeof value === "string" ? value : String(value);
-    }
-  } catch {
-    return obj;
-  }
-
-  return obj;
-}

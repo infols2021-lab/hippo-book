@@ -2,16 +2,37 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useCallback } from "react";
 
-export default function SmartBackButton() {
+type Props = {
+  /** Куда уходить, если истории назад нет (прямой заход / открытие в новой вкладке). */
+  fallbackHref?: string;
+};
+
+export default function SmartBackButton({ fallbackHref = "/info" }: Props = {}) {
   const router = useRouter();
 
+  // history.length === 1 означает первую страницу вкладки (пользователь зашёл
+  // напрямую по ссылке) — тогда router.back() «ничего не делает». Поэтому длину
+  // истории читаем прямо в момент клика и при невозможности вернуться назад
+  // безопасно уходим на fallback (/info), а не молчим.
+  const handleBack = useCallback(() => {
+    const canGoBack = typeof window !== "undefined" && window.history.length > 1;
+    if (canGoBack) {
+      router.back();
+    } else {
+      router.push(fallbackHref);
+    }
+  }, [fallbackHref, router]);
+
   return (
-    <button 
-      onClick={() => router.back()} 
-      style={{ 
-        display: 'inline-flex', 
-        alignItems: 'center', 
+    <button
+      type="button"
+      onClick={handleBack}
+      aria-label="Назад"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
         gap: '8px',
         padding: '10px 20px',
         background: '#ffffff',
@@ -21,6 +42,7 @@ export default function SmartBackButton() {
         fontWeight: 800,
         fontSize: '15px',
         cursor: 'pointer',
+        flexShrink: 0,
         boxShadow: '0 4px 6px rgba(0,0,0,0.02)',
         transition: 'all 0.2s ease',
       }}

@@ -58,7 +58,8 @@ button, input, optgroup, select, textarea { font-family: inherit; font-style: in
 
 .modal-panel {
   width: 100%;
-  max-width: 760px;
+  min-width: 0;
+  max-width: min(760px, calc(100vw - 32px));
   border-radius: 28px;
   background: var(--project-card-bg); /* ПЛОТНЫЙ ЦВЕТ, НИКАКОЙ ПРОЗРАЧНОСТИ */
   color: var(--project-text);
@@ -98,7 +99,7 @@ button, input, optgroup, select, textarea { font-family: inherit; font-style: in
   transition: all 0.2s ease;
 }
 .modal-close:hover { background: color-mix(in srgb, var(--project-text) 12%, transparent); }
-.modal-body { padding: 24px; overflow-y: auto; flex: 1; color: var(--project-text); overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.modal-body { padding: 24px; overflow: auto; flex: 1; min-width: 0; color: var(--project-text); overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 
 /* ===== ИНПУТЫ ===== */
 .form-group { margin-bottom: 16px; }
@@ -132,3 +133,28 @@ button, input, optgroup, select, textarea { font-family: inherit; font-style: in
 .input:disabled, select:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .small-muted { font-size: 13px; color: var(--project-text); opacity: 0.6; margin-top: 6px; }
+
+/* ===== Узкие экраны (320–420px): компактные модалки с внутренним скроллом ===== */
+@media (max-width: 480px) {
+  .modal-overlay {
+    padding: 12px;
+  }
+
+  .modal-panel {
+    max-width: calc(100vw - 24px);
+    max-height: 85vh;
+  }
+
+  .modal-body {
+    max-height: calc(85vh - 76px);
+    padding: 16px;
+  }
+
+  .modal-header {
+    padding: 14px 16px;
+  }
+
+  .modal-title {
+    font-size: 17px;
+  }
+}

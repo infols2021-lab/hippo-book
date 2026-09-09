@@ -5,7 +5,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isValidUUID } from "@/lib/api/validate";
 import {
-  parseProdamusBody,
+  buildProdamusSignatureString,
+  computeProdamusSignature,
   verifyProdamusSignature,
 } from "@/lib/payments/prodamus";
 import { grantAccessForRequest } from "@/lib/requests/grants";
@@ -268,9 +269,27 @@ async function syncProdamusSheet(supabase: SupabaseClient, requestRow: RequestRo
 }
 
 export async function POST(req: NextRequest) {
+  const startedAt = Date.now();
+  const method = req.method;
   const contentType = String(req.headers.get("content-type") ?? "");
+  const signHeader = String(req.headers.get("Sign") ?? req.headers.get("sign") ?? "").trim();
 
-  // 1. Сырое тело + лог входящего запроса.
+  // 1. Подробный лог входящего запроса: метод, заголовки (особенно Sign и
+  //    Content-Type) и сырое тело. Продамус ретраит не-200 ответы, поэтому
+  //    по этим логам удобно сверять подпись/поля даже после ошибок.
+  const headersLog: Record<string, string> = {};
+  req.headers.forEach((value, key) => {
+    headersLog[key] = value;
+  });
+
+  console.log("[ProdamusWebhook] ──────────────────────────────────────────");
+  console.log("[ProdamusWebhook] Входящий POST вебхук. method=", method, "| url=", req.url);
+  console.log("[ProdamusWebhook] Content-Type=", contentType);
+  console.log("[ProdamusWebhook] Заголовки:", JSON.stringify(headersLog));
+  console.log("[ProdamusWebhook] Sign=", signHeader || "(отсутствует)");
+
+  // 2. Сырое тело (читаем один раз и логируем, затем «переигрываем» запрос,
+  //    чтобы ниже можно было использовать req.formData()).
   let rawBody = "";
   try {
     rawBody = await req.text();
@@ -278,34 +297,110 @@ export async function POST(req: NextRequest) {
     console.error("[ProdamusWebhook] Не удалось прочитать тело:", errorMessage(error));
     return new Response("Bad Request", { status: 400 });
   }
+  console.log("[ProdamusWebhook] Сырое тело:", rawBody.slice(0, 6000) || "(пусто)");
 
-  console.log("[ProdamusWebhook] Входящий вебхук. content-type=", contentType);
-  console.log("[ProdamusWebhook] Сырое тело:", rawBody.slice(0, 4000) || "(пусто)");
-
-  const signHeader = req.headers.get("Sign");
-  console.log("[ProdamusWebhook] Заголовок Sign:", signHeader ?? "(отсутствует)");
-
-  // 2. Парсинг тела (json или urlencoded).
-  const body = parseProdamusBody(rawBody, contentType);
+  // 3. Универсальный парсинг тела. Продамус присылает вебхук НЕ в чистом JSON,
+  //    а как multipart/form-data (см. help.prodamus.ru: «Веб-хук отправляется
+  //    POST-запросом в формате multipart/form-data»). Раньше тело парсилось
+  //    через URLSearchParams от req.text() — для multipart это давало мусор,
+  //    подпись не сходилась, и мы отвечали 400.
+  let body: Record<string, unknown>;
+  try {
+    if (contentType.includes("application/json")) {
+      const parsedJson: unknown = rawBody ? JSON.parse(rawBody) : {};
+      body =
+        parsedJson && typeof parsedJson === "object" && !Array.isArray(parsedJson)
+          ? (parsedJson as Record<string, unknown>)
+          : {};
+    } else {
+      // req.text() уже «съел» стрим тела, поэтому собираем новый Request
+      // из сырой строки — formData() сам разберёт и multipart, и urlencoded.
+      // Content-length/transfer-encoding не копируем: длина тела после
+      // «переигрывания» может отличаться от исходной.
+      const replayHeaders: Record<string, string> = {};
+      req.headers.forEach((value, key) => {
+        const lowerKey = key.toLowerCase();
+        if (lowerKey === "content-length" || lowerKey === "transfer-encoding") return;
+        replayHeaders[key] = value;
+      });
+      const replayReq = new Request(req.url, {
+        method: "POST",
+        headers: replayHeaders,
+        body: rawBody,
+      });
+      const formData = await replayReq.formData();
+      body = {};
+      formData.forEach((value, key) => {
+        body[key] = typeof value === "string" ? value : String(value);
+      });
+    }
+  } catch (error) {
+    console.error(
+      "[ProdamusWebhook] Ошибка парсинга тела. content-type=",
+      contentType,
+      "| error=",
+      errorMessage(error),
+    );
+    return new Response("Bad Request", { status: 400 });
+  }
 
   if (!body || Object.keys(body).length === 0) {
     console.error("[ProdamusWebhook] Тело пустое или не распарсилось. content-type=", contentType);
     return new Response("Bad Request", { status: 400 });
   }
+  console.log("[ProdamusWebhook] Распарсенное тело:", JSON.stringify(body).slice(0, 6000));
 
-  // 3. Верификация подписи.
-  const valid = verifyProdamusSignature(body, signHeader);
-  console.log("[ProdamusWebhook] Результат проверки подписи:", valid ? "OK" : "FAIL");
-
-  if (!valid) {
+  // 4. Верификация подписи. При расхождении логируем КАНОНИЧЕСКУЮ строку,
+  //    нашу подпись и полученную — чтобы было видно точную причину 400.
+  if (!signHeader) {
     console.error(
-      "[ProdamusWebhook][HACK?] Невалидная подпись Sign. body=",
-      JSON.stringify(body).slice(0, 2000),
+      "[ProdamusWebhook][SIGN-FAIL] Заголовок Sign отсутствует. headers=",
+      JSON.stringify(headersLog),
     );
     return new Response("Bad Request", { status: 400 });
   }
 
-  // 4. order_ref: Продамус возвращает наш id в order_num (иногда в order_id).
+  let expectedSign = "";
+  try {
+    expectedSign = computeProdamusSignature(body);
+  } catch (error) {
+    console.error(
+      "[ProdamusWebhook][SIGN-FAIL] computeProdamusSignature завершился ошибкой " +
+        "(проверьте PRODAMUS_SECRET_KEY в env):",
+      errorMessage(error),
+    );
+    return new Response("Internal Server Error", { status: 500 });
+  }
+  const receivedSign = signHeader.toLowerCase();
+
+  if (!expectedSign) {
+    console.error(
+      "[ProdamusWebhook][SIGN-FAIL] Не задан/пуст PRODAMUS_SECRET_KEY или нечего подписывать.",
+    );
+    return new Response("Internal Server Error", { status: 500 });
+  }
+
+  const valid = verifyProdamusSignature(body, receivedSign);
+
+  if (!valid) {
+    console.error(
+      "[ProdamusWebhook][SIGN-FAIL] Подпись НЕ совпала.\n" +
+        "  canonicalString = " + buildProdamusSignatureString(body) + "\n" +
+        "  computed (ours) = " + expectedSign + "\n" +
+        "  received (Sign) = " + receivedSign,
+    );
+    return new Response("Bad Request", { status: 400 });
+  }
+
+  console.log(
+    "[ProdamusWebhook] Подпись валидна. Sign=",
+    receivedSign,
+    "| обработка заняла",
+    Date.now() - startedAt,
+    "ms",
+  );
+
+  // 5. order_ref: Продамус возвращает наш id в order_num (иногда в order_id).
   const orderRef = String(body?.order_num ?? body?.order_id ?? "").trim();
   console.log(
     "[ProdamusWebhook] order_num=",
@@ -321,7 +416,7 @@ export async function POST(req: NextRequest) {
     return new Response("Bad Request", { status: 400 });
   }
 
-  // 5. Статус платежа: выдаём доступы только при payment_status = success.
+  // 6. Статус платежа: выдаём доступы только при payment_status = success.
   const paymentStatusRaw = String(body?.payment_status ?? "").trim();
   const paymentStatus = paymentStatusRaw.toLowerCase();
   console.log("[ProdamusWebhook] payment_status=", JSON.stringify(paymentStatusRaw));
@@ -339,7 +434,7 @@ export async function POST(req: NextRequest) {
 
   const supabase = getSupabaseAdminClient();
 
-  // 6. Поиск заявки: сначала по request_number, затем по id (uuid).
+  // 7. Поиск заявки: сначала по request_number, затем по id (uuid).
   const requestRow = await findRequestByOrderRef(supabase, orderRef);
 
   if (!requestRow) {
@@ -361,13 +456,13 @@ export async function POST(req: NextRequest) {
     }),
   );
 
-  // 7. Идемпотентность: повторный вебхук по обработанной заявке.
+  // 8. Идемпотентность: повторный вебхук по обработанной заявке.
   if (requestRow.is_processed === true) {
     console.log("[ProdamusWebhook] Повторный вебхук, заявка уже обработана. id=", requestRow.id);
     return new Response("OK", { status: 200 });
   }
 
-  // 8. Выдача доступов + пометка обработанной.
+  // 9. Выдача доступов + пометка обработанной.
   try {
     console.log("[ProdamusWebhook] Начинаем выдачу доступов. id=", requestRow.id);
     const grantResult = await grantAndMarkProcessed(supabase, requestRow);
@@ -389,7 +484,7 @@ export async function POST(req: NextRequest) {
     return new Response("Internal Server Error", { status: 500 });
   }
 
-  // 9. Google Sheets (отдельный лист) — не роняет выдачу.
+  // 10. Google Sheets (отдельный лист) — не роняет выдачу.
   await syncProdamusSheet(supabase, requestRow);
 
   console.log("[ProdamusWebhook] Заявка обработана автоматически. id=", requestRow.id);

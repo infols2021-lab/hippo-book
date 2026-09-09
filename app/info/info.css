@@ -552,3 +552,42 @@ a.info-card:hover {
     gap: 4px;
   }
 }
+
+/* ==================== Очень узкие телефоны (< 420px) ==================== */
+
+@media (max-width: 420px) {
+  .info-wrap {
+    padding: 12px 10px;
+  }
+
+  .info-main-card {
+    padding: 20px 16px;
+    border-radius: 20px;
+  }
+
+  .info-topbar-left {
+    gap: 10px;
+  }
+
+  .info-title {
+    font-size: 24px;
+  }
+
+  .info-subtitle {
+    font-size: 13px;
+  }
+
+  .info-badge {
+    padding: 6px 10px;
+  }
+
+  .info-badge-text {
+    font-size: 12px;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .info-action-btn {
+    padding: 16px;
+  }
+}

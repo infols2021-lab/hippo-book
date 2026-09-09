@@ -43,12 +43,12 @@ export default function GrantedAccessModal({ projectSlug }: { projectSlug: strin
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 12000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, boxSizing: "border-box", backgroundColor: "rgba(15, 23, 42, 0.72)", backdropFilter: "blur(6px)" }}>
-      <div style={{ width: "100%", maxWidth: 460, backgroundColor: "var(--project-card-bg, #ffffff)", color: "var(--project-text, #0f172a)", borderRadius: 24, padding: 24, textAlign: "center", boxShadow: "0 30px 70px rgba(0,0,0,0.35)" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 12000, display: "flex", alignItems: "center", justifyContent: "center", padding: "clamp(12px, 4vw, 20px)", boxSizing: "border-box", backgroundColor: "rgba(15, 23, 42, 0.72)", backdropFilter: "blur(6px)" }}>
+      <div style={{ width: "100%", maxWidth: "min(460px, calc(100vw - 32px))", maxHeight: "85vh", overflowY: "auto", overscrollBehavior: "contain", boxSizing: "border-box", backgroundColor: "var(--project-card-bg, #ffffff)", color: "var(--project-text, #0f172a)", borderRadius: 24, padding: "clamp(16px, 5vw, 24px)", textAlign: "center", boxShadow: "0 30px 70px rgba(0,0,0,0.35)" }}>
         {cover ? (
-          <img src={cover} alt="" style={{ width: 180, height: 180, objectFit: "cover", borderRadius: 16, margin: "0 auto 16px", display: "block", background: "#f1f5f9" }} />
+          <img src={cover} alt="" style={{ width: "clamp(140px, 40vw, 180px)", height: "clamp(140px, 40vw, 180px)", objectFit: "cover", borderRadius: 16, margin: "0 auto 16px", display: "block", background: "#f1f5f9" }} />
         ) : (
-          <div style={{ width: 180, height: 180, borderRadius: 16, margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 44, backgroundColor: "color-mix(in srgb, var(--project-primary) 10%, transparent)", color: "var(--project-primary)" }}>
+          <div style={{ width: "clamp(140px, 40vw, 180px)", height: "clamp(140px, 40vw, 180px)", borderRadius: 16, margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 44, backgroundColor: "color-mix(in srgb, var(--project-primary) 10%, transparent)", color: "var(--project-primary)" }}>
             {current.material_title ? current.material_title.charAt(0) : "M"}
           </div>
         )}
