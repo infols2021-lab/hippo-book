@@ -3,8 +3,27 @@ import "./globals.css";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "skilLS — Образовательная онлайн-платформа",
-  description: "Интерактивная подготовка к международным экзаменам и олимпиадам",
+  metadataBase: new URL("https://hipposha-book.ru"),
+  title: "skilLS — подготовка к олимпиаде Hippo и экзаменам Gatehouse Awards",
+  description:
+    "skilLS — онлайн-платформа для подготовки к международной олимпиаде Hippo и экзаменам Gatehouse Awards. Интерактивные задания по английскому: тесты, аудирование, кроссворды и аналитика прогресса.",
+  keywords: [
+    "материалы хиппо",
+    "олимпиада hippo подготовка",
+    "gatehouse awards подготовка к экзаменам",
+    "тесты hippo английский",
+    "платформа скиллс",
+    "интерактивные задания по английскому",
+  ],
+  openGraph: {
+    type: "website",
+    url: "https://hipposha-book.ru",
+    siteName: "skilLS",
+    title: "skilLS — подготовка к олимпиаде Hippo и экзаменам Gatehouse Awards",
+    description:
+      "Интерактивная подготовка к международной олимпиаде Hippo и экзаменам Gatehouse Awards: тесты, аудирование, кроссворды и аналитика прогресса.",
+    locale: "ru_RU",
+  },
 };
 
 export default function RootLayout({
