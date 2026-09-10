@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180" role="img" aria-label="skilLS">
+  <defs>
+    <linearGradient id="skl-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4fc3f7"/>
+      <stop offset="0.55" stop-color="#0ea5e9"/>
+      <stop offset="1" stop-color="#0066cc"/>
+    </linearGradient>
+    <linearGradient id="skl-gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.30"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="180" height="180" rx="42" fill="url(#skl-bg)"/>
+  <rect x="0" y="0" width="180" height="180" rx="42" fill="url(#skl-gloss)"/>
+  <g transform="translate(-2,2.5)" fill="none" stroke="#ffffff" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M54 56 L54 124 L88 124"/>
+    <path d="M130 68 C130 57 115 51 103 57 C90 63 92 78 106 85 C120 92 122 101 115 111 C108 121 90 120 83 110"/>
+  </g>
+</svg>

@@ -145,6 +145,22 @@ export default async function InfoPage({
               </div>
               <span className="info-action-arrow">→</span>
             </Link>
+
+            <Link className="info-action-btn" href="/olympiads/hippo">
+              <div className="info-action-content">
+                <div className="info-action-title">Олимпиада HIPPO</div>
+                <div className="info-action-sub">подготовка к олимпиаде по английскому</div>
+              </div>
+              <span className="info-action-arrow">→</span>
+            </Link>
+
+            <Link className="info-action-btn" href="/exams/gatehouse-awards">
+              <div className="info-action-content">
+                <div className="info-action-title">Gatehouse Awards</div>
+                <div className="info-action-sub">подготовка к экзаменам ESOL</div>
+              </div>
+              <span className="info-action-arrow">→</span>
+            </Link>
           </div>
         </div>
       </div>

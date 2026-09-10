@@ -27,6 +27,31 @@ export const metadata: Metadata = {
   },
 };
 
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://hipposha-book.ru/#website",
+      name: "skilLS",
+      alternateName: "Скиллс",
+      url: "https://hipposha-book.ru/",
+      inLanguage: "ru-RU",
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://hipposha-book.ru/#organization",
+      name: "skilLS",
+      url: "https://hipposha-book.ru/",
+      logo: "https://hipposha-book.ru/apple-icon.png",
+      sameAs: [
+        "https://t.me/hippo_ga_cfo",
+        "https://taplink.cc/hippo_ga",
+      ],
+    },
+  ],
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -44,6 +69,10 @@ export default function RootLayout({
         <link 
           href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@400;500;600;700;800;900&display=swap" 
           rel="stylesheet" 
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
       </head>
       <body className="min-h-full m-0 p-0 flex flex-col bg-[var(--p-page-bg,#0b0f19)] text-white antialiased">

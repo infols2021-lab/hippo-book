@@ -1075,6 +1075,12 @@ function LoginPageContent() {
                 <Link className="aux-btn" href="/info">
                   Информация
                 </Link>
+                <Link className="aux-btn" href="/olympiads/hippo">
+                  Олимпиада HIPPO
+                </Link>
+                <Link className="aux-btn" href="/exams/gatehouse-awards">
+                  Gatehouse Awards
+                </Link>
                 <button className="aux-btn" onClick={() => setHelpOpen(true)} type="button">
                   Помощь
                 </button>
