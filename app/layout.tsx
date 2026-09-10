@@ -23,6 +23,7 @@ export const metadata: Metadata = {
     description:
       "Интерактивная подготовка к международной олимпиаде Hippo и экзаменам Gatehouse Awards: тесты, аудирование, кроссворды и аналитика прогресса.",
     locale: "ru_RU",
+    images: ["/skills.png"], // <-- Обложка подключена здесь
   },
 };
 
